@@ -56,9 +56,10 @@ function ResetPassword() {
       const response = await authAPI.resetPassword(token, formData.newPassword);
 
       if (response.success) {
-        setSuccess(response.message);
+        setSuccess(response.message || 'Đặt lại mật khẩu thành công! Bạn sẽ được chuyển đến trang đăng nhập...');
+        // Redirect về trang đăng nhập sau 2 giây
         setTimeout(() => {
-          navigate('/login');
+          navigate('/login?reset=success');
         }, 2000);
       }
     } catch (err) {
@@ -95,7 +96,12 @@ function ResetPassword() {
 
           {success && (
             <div className={`${styles.alert} ${styles.alertSuccess}`}>
-              <div>{success}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{success}</span>
+              </div>
             </div>
           )}
 

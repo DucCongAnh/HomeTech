@@ -61,7 +61,8 @@ public class EmailService {
         helper.setTo(toEmail);
         helper.setSubject("Đặt lại mật khẩu HomeTech");
 
-        String resetLink = "http://localhost:8080/auth/reset-password?token=" + resetToken;
+        // Link về frontend để user có thể đặt lại mật khẩu
+        String resetLink = "http://localhost:5173/reset-password?token=" + resetToken;
 
         String htmlContent = """
             <html>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import styles from './Login.module.css';
 
@@ -9,8 +9,32 @@ function Login() {
     password: '',
   });
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Kiểm tra query parameters từ email verification và reset password
+  useEffect(() => {
+    const verified = searchParams.get('verified');
+    const message = searchParams.get('message');
+    const errorParam = searchParams.get('error');
+    const reset = searchParams.get('reset');
+
+    if (verified === 'true' && message) {
+      setSuccessMessage(decodeURIComponent(message));
+      // Xóa query parameters khỏi URL
+      navigate('/login', { replace: true });
+    } else if (verified === 'false' && errorParam) {
+      setError(decodeURIComponent(errorParam));
+      // Xóa query parameters khỏi URL
+      navigate('/login', { replace: true });
+    } else if (reset === 'success') {
+      setSuccessMessage('Đặt lại mật khẩu thành công! Bạn có thể đăng nhập với mật khẩu mới.');
+      // Xóa query parameters khỏi URL
+      navigate('/login', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -74,6 +98,11 @@ function Login() {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className={`${styles.alert} ${styles.alertSuccess || styles.alert}`} style={{ backgroundColor: '#d4edda', color: '#155724', borderColor: '#c3e6cb' }}>
+              <div>{successMessage}</div>
+            </div>
+          )}
           {error && (
             <div className={`${styles.alert} ${styles.alertError}`}>
               <div>{error}</div>

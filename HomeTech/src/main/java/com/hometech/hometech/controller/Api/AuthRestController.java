@@ -76,17 +76,19 @@ public class AuthRestController {
 
 
     @GetMapping("/verify-email")
-    public ResponseEntity<Map<String, Object>> verifyEmail(@RequestParam("token") String token) {
-        Map<String, Object> response = new HashMap<>();
+    public void verifyEmail(@RequestParam("token") String token, 
+                           HttpServletResponse httpResponse) throws IOException {
         try {
             String message = authService.verifyEmail(token);
-            response.put("success", true);
-            response.put("message", message);
-            return ResponseEntity.ok(response);
+            // Redirect về trang đăng nhập frontend với thông báo thành công
+            String frontendUrl = "http://localhost:5173/login?verified=true&message=" + 
+                java.net.URLEncoder.encode(message, java.nio.charset.StandardCharsets.UTF_8);
+            httpResponse.sendRedirect(frontendUrl);
         } catch (RuntimeException e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            // Redirect về trang đăng nhập với thông báo lỗi
+            String frontendUrl = "http://localhost:5173/login?verified=false&error=" + 
+                java.net.URLEncoder.encode(e.getMessage(), java.nio.charset.StandardCharsets.UTF_8);
+            httpResponse.sendRedirect(frontendUrl);
         }
     }
 

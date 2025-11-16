@@ -258,5 +258,108 @@ export const adminAPI = {
   },
 };
 
+// User API (Public)
+export const userAPI = {
+  // Products
+  getAllProducts: async () => {
+    const response = await api.get('/products');
+    return response.data;
+  },
+  
+  getProductById: async (id) => {
+    const response = await api.get(`/products/${id}`);
+    return response.data;
+  },
+  
+  getProductImages: async (productId) => {
+    const response = await api.get(`/products/${productId}/images`);
+    return response.data;
+  },
+  
+  getActiveProductsByCategory: async (categoryId) => {
+    const response = await api.get(`/products/category/${categoryId}/active`);
+    return response.data;
+  },
+  
+  searchProducts: async (keyword) => {
+    const response = await api.get('/products/search', {
+      params: { keyword }
+    });
+    return response.data;
+  },
+  
+  getTopSelling: async () => {
+    const response = await api.get('/products/top-selling');
+    return response.data;
+  },
+  
+  getNewestProducts: async () => {
+    const response = await api.get('/products/newest');
+    return response.data;
+  },
+  
+  getLast7DaysProducts: async () => {
+    const response = await api.get('/products/last-7-days');
+    return response.data;
+  },
+  
+  // Categories
+  getAllCategories: async () => {
+    const response = await api.get('/categories');
+    return response.data;
+  },
+  
+  getCategoryById: async (id) => {
+    const response = await api.get(`/categories/${id}`);
+    return response.data;
+  },
+  
+  // Cart
+  getCart: async (userId) => {
+    const response = await api.get(`/cart/user/${userId}`);
+    return response.data;
+  },
+  
+  addToCart: async (userId, productId, quantity = 1) => {
+    const response = await api.post('/cart/add', null, {
+      params: { userId, productId, quantity }
+    });
+    return response.data;
+  },
+  
+  increaseCartItem: async (userId, itemId) => {
+    const response = await api.put(`/cart/increase/${userId}/${itemId}`);
+    return response.data;
+  },
+  
+  decreaseCartItem: async (userId, itemId) => {
+    const response = await api.put(`/cart/decrease/${userId}/${itemId}`);
+    return response.data;
+  },
+  
+  deleteCartItem: async (userId, itemId) => {
+    const response = await api.delete(`/cart/remove/${userId}/${itemId}`);
+    return response.data;
+  },
+  
+  // Reviews
+  getProductReviews: async (productId) => {
+    const response = await api.get(`/reviews/product/${productId}`);
+    return response.data;
+  },
+  
+  getProductRating: async (productId) => {
+    const response = await api.get(`/reviews/rating/${productId}`);
+    return response.data;
+  },
+  
+  createReview: async (productId, customerId, rating, content, images = []) => {
+    const response = await api.post('/reviews', images, {
+      params: { productId, customerId, rating, content }
+    });
+    return response.data;
+  },
+};
+
 export default api;
 

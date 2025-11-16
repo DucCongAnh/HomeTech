@@ -8,6 +8,7 @@ import AdminRegister from './pages/AdminRegister';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import OAuthCallback from './pages/OAuthCallback';
 import Home from './pages/Home';
+import ProductDetail from './pages/ProductDetail';
 import './App.css';
 
 function App() {
@@ -32,11 +33,12 @@ function App() {
         {/* OAuth2 callback */}
         <Route path="/oauth2/callback" element={<OAuthCallback />} />
         
-        {/* Protected routes */}
+        {/* Public product routes */}
         <Route path="/" element={<Home />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
         
         {/* Default redirect */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
