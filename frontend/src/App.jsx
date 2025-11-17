@@ -9,6 +9,10 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import OAuthCallback from './pages/OAuthCallback';
 import Home from './pages/Home';
 import ProductDetail from './pages/ProductDetail';
+import Cart from './pages/Cart';
+import Profile from './pages/Profile';
+import Orders from './pages/Orders';
+import Favorites from './pages/Favorites';
 import './App.css';
 
 function App() {
@@ -36,6 +40,10 @@ function App() {
         {/* Public product routes */}
         <Route path="/" element={<Home />} />
         <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/orders" element={<Orders />} />
+        <Route path="/favorites" element={<Favorites />} />
         
         {/* Default redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,6 @@
 package com.hometech.hometech.service;
 
-import com.hometech.hometech.Repository.AccountReposirory;
+import com.hometech.hometech.Repository.AccountRepository;
 import com.hometech.hometech.Repository.UserRepository;
 import com.hometech.hometech.enums.RoleType;
 import com.hometech.hometech.model.Account;
@@ -26,9 +26,9 @@ import java.util.UUID;
 public class OAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
-    private final AccountReposirory accountRepository;
+    private final AccountRepository accountRepository;
 
-    public OAuth2UserService(UserRepository userRepository, AccountReposirory accountRepository) {
+    public OAuth2UserService(UserRepository userRepository, AccountRepository accountRepository) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
     }

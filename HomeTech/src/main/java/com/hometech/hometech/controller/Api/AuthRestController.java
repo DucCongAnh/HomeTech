@@ -122,15 +122,19 @@ public class AuthRestController {
         try {
             AuthService.AuthResponse authResponse = authService.loginAdmin(request.getUsernameOrEmail(), request.getPassword());
 
+            Map<String, Object> dataMap = new HashMap<>();
+            dataMap.put("accessToken", authResponse.getAccessToken());
+            dataMap.put("refreshToken", authResponse.getRefreshToken());
+            dataMap.put("username", authResponse.getUsername());
+            dataMap.put("email", authResponse.getEmail());
+            dataMap.put("role", authResponse.getRole());
+            if (authResponse.getAdminId() != null) {
+                dataMap.put("adminId", authResponse.getAdminId());
+            }
+            
             response.put("success", true);
             response.put("message", authResponse.getMessage());
-            response.put("data", Map.of(
-                    "accessToken", authResponse.getAccessToken(),
-                    "refreshToken", authResponse.getRefreshToken(),
-                    "username", authResponse.getUsername(),
-                    "email", authResponse.getEmail(),
-                    "role", authResponse.getRole()
-            ));
+            response.put("data", dataMap);
 
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
@@ -337,16 +341,27 @@ public class AuthRestController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
 
+        // Tìm User từ username để lấy id
+        User user = userRepository.findByAccount_Username(userDetails.getUsername());
+        
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("username", userDetails.getUsername());
+        userData.put("authorities", userDetails.getAuthorities());
+        userData.put("enabled", userDetails.isEnabled());
+        userData.put("accountNonExpired", userDetails.isAccountNonExpired());
+        userData.put("accountNonLocked", userDetails.isAccountNonLocked());
+        userData.put("credentialsNonExpired", userDetails.isCredentialsNonExpired());
+        
+        // Thêm id nếu tìm thấy user
+        if (user != null) {
+            userData.put("id", user.getId());
+            userData.put("fullName", user.getFullName());
+            userData.put("email", user.getAccount() != null ? user.getAccount().getEmail() : null);
+        }
+
         response.put("success", true);
         response.put("message", "Lấy thông tin user thành công");
-        response.put("data", Map.of(
-                "username", userDetails.getUsername(),
-                "authorities", userDetails.getAuthorities(),
-                "enabled", userDetails.isEnabled(),
-                "accountNonExpired", userDetails.isAccountNonExpired(),
-                "accountNonLocked", userDetails.isAccountNonLocked(),
-                "credentialsNonExpired", userDetails.isCredentialsNonExpired()
-        ));
+        response.put("data", userData);
 
         return ResponseEntity.ok(response);
     }

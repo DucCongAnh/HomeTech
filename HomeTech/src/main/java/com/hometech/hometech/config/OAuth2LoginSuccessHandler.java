@@ -1,6 +1,6 @@
 package com.hometech.hometech.config;
 
-import com.hometech.hometech.Repository.AccountReposirory;
+import com.hometech.hometech.Repository.AccountRepository;
 import com.hometech.hometech.Repository.CustomerRepository;
 import com.hometech.hometech.enums.RoleType;
 import com.hometech.hometech.model.Account;
@@ -25,12 +25,12 @@ import java.time.LocalDateTime;
 @Component
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
-    private final AccountReposirory accountRepository;
+    private final AccountRepository accountRepository;
     private final CustomerRepository customerRepository;
     private final CustomUserDetailsService userDetailsService;
     private final JwtService jwtService;
 
-    public OAuth2LoginSuccessHandler(AccountReposirory accountRepository,
+    public OAuth2LoginSuccessHandler(AccountRepository accountRepository,
                                      CustomerRepository customerRepository,
                                      CustomUserDetailsService userDetailsService,
                                      JwtService jwtService) {

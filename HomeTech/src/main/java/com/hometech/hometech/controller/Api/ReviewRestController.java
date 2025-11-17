@@ -163,4 +163,17 @@ public class ReviewRestController {
         List<Response> responses = responseService.getAllResponses();
         return buildResponse(true, "Danh sách phản hồi", responses, HttpStatus.OK);
     }
+
+    // ==============================
+    // 11. Lấy tất cả đánh giá (cho admin)
+    // ==============================
+    @GetMapping("/all")
+    public ResponseEntity<Map<String, Object>> getAllReviews() {
+        try {
+            List<Review> reviews = reviewService.getAllReviews();
+            return buildResponse(true, "Danh sách tất cả đánh giá", reviews, HttpStatus.OK);
+        } catch (Exception e) {
+            return buildResponse(false, e.getMessage(), null, HttpStatus.BAD_REQUEST);
+        }
+    }
 }
