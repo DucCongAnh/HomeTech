@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { userAPI } from '../services/api';
+import { userAPI, authAPI } from '../services/api';
+import api from '../services/api';
 import styles from './ProductDetail.module.css';
 
 function ProductDetail() {
@@ -12,10 +13,26 @@ function ProductDetail() {
   const [averageRating, setAverageRating] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [userInfo, setUserInfo] = useState(null);
+  const [cartItemCount, setCartItemCount] = useState(0);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewContent, setReviewContent] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewResponses, setReviewResponses] = useState({});
 
   useEffect(() => {
     loadProductData();
+    loadUserInfo();
   }, [id]);
+
+  useEffect(() => {
+    if (userInfo && userInfo.id) {
+      loadCartCount();
+    }
+  }, [userInfo]);
 
   const loadProductData = async () => {
     try {
@@ -42,11 +59,134 @@ function ProductDetail() {
 
       const rating = ratingRes.data || 0;
       setAverageRating(rating);
+      
+      // Load responses for all reviews
+      const responsePromises = reviewsData.map(async (review) => {
+        try {
+          const responseRes = await userAPI.getReviewResponse(review.id);
+          return { reviewId: review.id, response: responseRes.data };
+        } catch (error) {
+          return { reviewId: review.id, response: null };
+        }
+      });
+      
+      const responses = await Promise.all(responsePromises);
+      const responsesMap = {};
+      responses.forEach(({ reviewId, response }) => {
+        if (response) {
+          responsesMap[reviewId] = response;
+        }
+      });
+      setReviewResponses(responsesMap);
 
     } catch (error) {
       console.error('Error loading product:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUserInfo = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        return; // Không có token thì không load user info
+      }
+      const response = await api.get('/auth/user-info');
+      if (response.data.success) {
+        setUserInfo(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading user info:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
+    }
+  };
+
+  const loadCartCount = async () => {
+    try {
+      const response = await userAPI.getCart(userInfo.id);
+      const items = response.data || [];
+      const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+      setCartItemCount(totalCount);
+    } catch (error) {
+      console.error('Error loading cart count:', error);
+      setCartItemCount(0);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token || !userInfo) {
+      alert('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng');
+      navigate('/login');
+      return;
+    }
+
+    if (quantity < 1 || quantity > product.stock) {
+      alert(`Số lượng không hợp lệ. Vui lòng chọn từ 1 đến ${product.stock} sản phẩm.`);
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      console.log('Adding to cart:', { userId: userInfo.id, productId: product.id, quantity });
+      const response = await userAPI.addToCart(userInfo.id, product.id, quantity);
+      console.log('Add to cart response:', response);
+      alert(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+      setQuantity(1); // Reset về 1 sau khi thêm thành công
+      loadCartCount(); // Refresh cart count
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        navigate('/login');
+      } else {
+        alert('Có lỗi xảy ra khi thêm sản phẩm vào giỏ hàng: ' + (error.message || 'Unknown error'));
+      }
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleIncreaseQuantity = () => {
+    if (product && quantity < product.stock) {
+      setQuantity(quantity + 1);
+    }
+  };
+
+  const handleDecreaseQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+    }
+  };
+
+  const handleQuantityChange = (e) => {
+    const value = parseInt(e.target.value) || 1;
+    if (product) {
+      if (value < 1) {
+        setQuantity(1);
+      } else if (value > product.stock) {
+        setQuantity(product.stock);
+      } else {
+        setQuantity(value);
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      localStorage.clear();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+      localStorage.clear();
+      navigate('/login');
     }
   };
 
@@ -73,6 +213,67 @@ function ProductDetail() {
         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
       </svg>
     ));
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    
+    if (!userInfo) {
+      alert('Vui lòng đăng nhập để đánh giá sản phẩm');
+      navigate('/login');
+      return;
+    }
+    
+    if (reviewRating === 0) {
+      alert('Vui lòng chọn số sao đánh giá');
+      return;
+    }
+    
+    if (!reviewContent.trim()) {
+      alert('Vui lòng nhập nội dung đánh giá');
+      return;
+    }
+    
+    try {
+      setSubmittingReview(true);
+      await userAPI.createReview(product.id, userInfo.id, reviewRating, reviewContent.trim());
+      alert('Đánh giá đã được gửi thành công!');
+      setReviewRating(0);
+      setReviewContent('');
+      setShowReviewForm(false);
+      await loadProductData(); // Reload để hiển thị review mới
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      alert('Có lỗi xảy ra khi gửi đánh giá');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const renderStarSelector = (currentRating, onRatingChange) => {
+    return (
+      <div className={styles.starSelector}>
+        {Array.from({ length: 5 }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            className={styles.starButton}
+            onClick={() => onRatingChange(i + 1)}
+            onMouseEnter={() => {
+              // Highlight stars on hover
+            }}
+          >
+            <svg
+              className={i < currentRating ? styles.starFilled : styles.starEmpty}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+          </button>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -102,9 +303,31 @@ function ProductDetail() {
           <Link to="/" className={styles.logo}>
             <span className={styles.logoText}>HomeTech</span>
           </Link>
-          <button onClick={() => navigate(-1)} className={styles.backButton}>
-            ← Quay lại
-          </button>
+          <div className={styles.headerActions}>
+            <Link to="/cart" className={styles.cartIcon}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {cartItemCount > 0 && (
+                <span className={styles.cartBadge}>{cartItemCount}</span>
+              )}
+            </Link>
+            {userInfo ? (
+              <>
+                <span className={styles.username}>{userInfo.username}</span>
+                <button onClick={handleLogout} className={styles.logoutButton}>
+                  Đăng xuất
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className={styles.loginButton}>
+                Đăng nhập
+              </Link>
+            )}
+            <button onClick={() => navigate(-1)} className={styles.backButton}>
+              ← Quay lại
+            </button>
+          </div>
         </div>
       </header>
 
@@ -164,9 +387,13 @@ function ProductDetail() {
 
           <div className={styles.priceSection}>
             <div className={styles.price}>{formatPrice(product.price)}</div>
-            {product.soldCount > 0 && (
-              <div className={styles.soldCount}>Đã bán: {product.soldCount}</div>
-            )}
+          </div>
+
+          <div className={styles.soldCount}>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <span>Đã bán: <strong>{product.soldCount || 0}</strong> sản phẩm</span>
           </div>
 
           {product.category && (
@@ -179,11 +406,50 @@ function ProductDetail() {
             <strong>Tồn kho:</strong> {product.stock > 0 ? `${product.stock} sản phẩm` : 'Hết hàng'}
           </div>
 
+          {product.stock > 0 && (
+            <div className={styles.quantitySelector}>
+              <label className={styles.quantityLabel}>Số lượng:</label>
+              <div className={styles.quantityControls}>
+                <button
+                  type="button"
+                  className={styles.quantityButton}
+                  onClick={handleDecreaseQuantity}
+                  disabled={quantity <= 1}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  className={styles.quantityInput}
+                  value={quantity}
+                  onChange={handleQuantityChange}
+                  min="1"
+                  max={product.stock}
+                />
+                <button
+                  type="button"
+                  className={styles.quantityButton}
+                  onClick={handleIncreaseQuantity}
+                  disabled={quantity >= product.stock}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className={styles.actions}>
-            <button className={styles.addToCartButton}>
-              Thêm vào giỏ hàng
+            <button 
+              className={styles.addToCartButton}
+              onClick={handleAddToCart}
+              disabled={addingToCart || !userInfo || product.stock <= 0}
+            >
+              {addingToCart ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
             </button>
-            <button className={styles.buyNowButton}>
+            <button 
+              className={styles.buyNowButton}
+              disabled={!userInfo || product.stock <= 0}
+            >
               Mua ngay
             </button>
           </div>
@@ -192,7 +458,59 @@ function ProductDetail() {
 
       {/* Reviews Section */}
       <section className={styles.reviewsSection}>
-        <h2 className={styles.reviewsTitle}>Đánh giá sản phẩm</h2>
+        <div className={styles.reviewsHeader}>
+          <h2 className={styles.reviewsTitle}>Đánh giá sản phẩm</h2>
+          {userInfo && (
+            <button
+              className={styles.writeReviewButton}
+              onClick={() => setShowReviewForm(!showReviewForm)}
+            >
+              {showReviewForm ? 'Hủy' : 'Viết đánh giá'}
+            </button>
+          )}
+        </div>
+        
+        {/* Review Form */}
+        {showReviewForm && userInfo && (
+          <form className={styles.reviewForm} onSubmit={handleSubmitReview}>
+            <div className={styles.reviewFormGroup}>
+              <label>Đánh giá của bạn:</label>
+              {renderStarSelector(reviewRating, setReviewRating)}
+            </div>
+            <div className={styles.reviewFormGroup}>
+              <label htmlFor="reviewContent">Nội dung đánh giá:</label>
+              <textarea
+                id="reviewContent"
+                className={styles.reviewTextarea}
+                value={reviewContent}
+                onChange={(e) => setReviewContent(e.target.value)}
+                placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
+                rows="5"
+                required
+              />
+            </div>
+            <div className={styles.reviewFormActions}>
+              <button
+                type="button"
+                className={styles.cancelReviewButton}
+                onClick={() => {
+                  setShowReviewForm(false);
+                  setReviewRating(0);
+                  setReviewContent('');
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className={styles.submitReviewButton}
+                disabled={submittingReview || reviewRating === 0}
+              >
+                {submittingReview ? 'Đang gửi...' : 'Gửi đánh giá'}
+              </button>
+            </div>
+          </form>
+        )}
         
         {averageRating > 0 && (
           <div className={styles.ratingSummary}>
@@ -209,6 +527,14 @@ function ProductDetail() {
         {reviews.length === 0 ? (
           <div className={styles.noReviews}>
             <p>Chưa có đánh giá nào cho sản phẩm này</p>
+            {userInfo && (
+              <button
+                className={styles.writeReviewButton}
+                onClick={() => setShowReviewForm(true)}
+              >
+                Viết đánh giá đầu tiên
+              </button>
+            )}
           </div>
         ) : (
           <div className={styles.reviewsList}>
@@ -245,6 +571,30 @@ function ProductDetail() {
                         className={styles.reviewImage}
                       />
                     ))}
+                  </div>
+                )}
+                
+                {/* Admin Response */}
+                {reviewResponses[review.id] && (
+                  <div className={styles.adminResponse}>
+                    <div className={styles.adminResponseHeader}>
+                      <div className={styles.adminResponseAvatar}>
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      </div>
+                      <div className={styles.adminResponseInfo}>
+                        <div className={styles.adminResponseName}>
+                          Phản hồi từ Admin
+                        </div>
+                        <div className={styles.adminResponseDate}>
+                          {formatDate(reviewResponses[review.id].repliedAt)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={styles.adminResponseContent}>
+                      {reviewResponses[review.id].content}
+                    </div>
                   </div>
                 )}
               </div>

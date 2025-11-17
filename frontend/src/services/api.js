@@ -207,6 +207,27 @@ export const adminAPI = {
     const response = await api.delete(`/products/images/${imageId}`);
     return response.data;
   },
+  
+  // Sort products
+  sortProductsByPriceAsc: async () => {
+    const response = await api.get('/products/sort/price/asc');
+    return response.data;
+  },
+  
+  sortProductsByPriceDesc: async () => {
+    const response = await api.get('/products/sort/price/desc');
+    return response.data;
+  },
+  
+  sortProductsBySoldAsc: async () => {
+    const response = await api.get('/products/sort/sold/asc');
+    return response.data;
+  },
+  
+  sortProductsBySoldDesc: async () => {
+    const response = await api.get('/products/sort/sold/desc');
+    return response.data;
+  },
 
   // Categories
   getAllCategories: async () => {
@@ -216,6 +237,11 @@ export const adminAPI = {
   
   getCategoryById: async (id) => {
     const response = await api.get(`/categories/${id}`);
+    return response.data;
+  },
+  
+  getCategoryInfo: async (id) => {
+    const response = await api.get(`/categories/${id}/info`);
     return response.data;
   },
   
@@ -254,6 +280,40 @@ export const adminAPI = {
     const response = await api.get('/users/search', {
       params: { keyword }
     });
+    return response.data;
+  },
+  
+  // Reviews Management
+  getAllReviews: async () => {
+    const response = await api.get('/reviews/all');
+    return response.data;
+  },
+  
+  hideReview: async (reviewId) => {
+    const response = await api.put(`/reviews/${reviewId}/hide`);
+    return response.data;
+  },
+  
+  showReview: async (reviewId) => {
+    const response = await api.put(`/reviews/${reviewId}/show`);
+    return response.data;
+  },
+  
+  // Review Responses
+  addResponseToReview: async (reviewId, adminId, content) => {
+    const response = await api.post(`/reviews/${reviewId}/response`, null, {
+      params: { adminId, content }
+    });
+    return response.data;
+  },
+  
+  deleteResponse: async (responseId) => {
+    const response = await api.delete(`/reviews/response/${responseId}`);
+    return response.data;
+  },
+  
+  getResponseByReview: async (reviewId) => {
+    const response = await api.get(`/reviews/${reviewId}/response`);
     return response.data;
   },
 };
@@ -321,10 +381,22 @@ export const userAPI = {
   },
   
   addToCart: async (userId, productId, quantity = 1) => {
-    const response = await api.post('/cart/add', null, {
-      params: { userId, productId, quantity }
-    });
-    return response.data;
+    // Gửi params trong URL query string cho POST request
+    try {
+      const response = await api.post(
+        `/cart/add?userId=${userId}&productId=${productId}&quantity=${quantity}`,
+        {},
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Add to cart error:', error);
+      throw error;
+    }
   },
   
   increaseCartItem: async (userId, itemId) => {
@@ -354,9 +426,27 @@ export const userAPI = {
   },
   
   createReview: async (productId, customerId, rating, content, images = []) => {
-    const response = await api.post('/reviews', images, {
+    const response = await api.post('/reviews', images || [], {
       params: { productId, customerId, rating, content }
     });
+    return response.data;
+  },
+  
+  // Responses
+  getReviewResponse: async (reviewId) => {
+    const response = await api.get(`/reviews/${reviewId}/response`);
+    return response.data;
+  },
+  
+  addReviewResponse: async (reviewId, adminId, content) => {
+    const response = await api.post(`/reviews/${reviewId}/response`, null, {
+      params: { adminId, content }
+    });
+    return response.data;
+  },
+  
+  deleteReviewResponse: async (responseId) => {
+    const response = await api.delete(`/reviews/response/${responseId}`);
     return response.data;
   },
 };

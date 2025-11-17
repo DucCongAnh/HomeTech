@@ -13,18 +13,59 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [productImages, setProductImages] = useState({});
+  const [cartItemCount, setCartItemCount] = useState(0);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [sortOption, setSortOption] = useState('default'); // default, priceAsc, priceDesc, soldAsc, soldDesc
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUserDropdown && !event.target.closest(`.${styles.userMenuContainer}`)) {
+        setShowUserDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserDropdown]);
+
+  // Debounce search
+  useEffect(() => {
+    if (searchKeyword.trim()) {
+      setIsSearching(true);
+      const timeoutId = setTimeout(() => {
+        performSearch(searchKeyword);
+      }, 500); // Wait 500ms after user stops typing
+
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    } else {
+      // If search is empty, restore all products
+      if (allProducts.length > 0) {
+        setProducts(allProducts);
+        setIsSearching(false);
+      }
+    }
+  }, [searchKeyword]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       
       // Load user info, products, categories, top selling in parallel
+      const token = localStorage.getItem('accessToken');
       const [userRes, productsRes, categoriesRes, topSellingRes] = await Promise.all([
-        api.get('/auth/user-info').catch(() => ({ data: { success: false } })),
+        token ? api.get('/auth/user-info').catch(() => ({ data: { success: false } })) : Promise.resolve({ data: { success: false } }),
         userAPI.getAllProducts().catch(() => ({ data: [] })),
         userAPI.getAllCategories().catch(() => ({ data: [] })),
         userAPI.getTopSelling().catch(() => ({ data: [] }))
@@ -32,11 +73,14 @@ function Home() {
 
       if (userRes.data.success) {
         setUserInfo(userRes.data.data);
+        // Load cart count
+        loadCartCount(userRes.data.data.id);
       }
 
-      const allProducts = productsRes.data || [];
+      const allProductsData = productsRes.data || [];
       // Chỉ lấy sản phẩm active (hidden = false)
-      const activeProducts = allProducts.filter(p => !p.hidden);
+      const activeProducts = allProductsData.filter(p => !p.hidden);
+      setAllProducts(activeProducts); // Store all products for search
       setProducts(activeProducts);
       
       setCategories(categoriesRes.data || []);
@@ -133,22 +177,150 @@ function Home() {
     }
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchKeyword.trim()) {
-      loadData();
+  const performSearch = async (keyword) => {
+    if (!keyword.trim()) {
+      setProducts(allProducts);
+      setIsSearching(false);
       return;
     }
 
     try {
-      setLoading(true);
-      const response = await userAPI.searchProducts(searchKeyword);
+      setSelectedCategoryId(null); // Reset category filter when searching
+      const response = await userAPI.searchProducts(keyword);
       const searchResults = response.data || [];
       setProducts(searchResults.filter(p => !p.hidden));
     } catch (error) {
       console.error('Search error:', error);
+      // Fallback to client-side search
+      const filtered = allProducts.filter(p => 
+        p.name?.toLowerCase().includes(keyword.toLowerCase()) ||
+        p.description?.toLowerCase().includes(keyword.toLowerCase())
+      );
+      setProducts(filtered);
     } finally {
-      setLoading(false);
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (searchKeyword.trim()) {
+      setIsSearching(true);
+      performSearch(searchKeyword);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchKeyword('');
+    setProducts(allProducts);
+    setSelectedCategoryId(null);
+    setIsSearching(false);
+  };
+
+  const handleCategoryClick = (categoryId) => {
+    setSelectedCategoryId(categoryId);
+    setSearchKeyword(''); // Clear search when filtering by category
+    setShowCategoryDropdown(false); // Close dropdown
+  };
+
+  const handleShowAllProducts = () => {
+    setSelectedCategoryId(null);
+    setSearchKeyword('');
+    setProducts(allProducts);
+    setSortOption('default');
+  };
+
+  const handleSort = async (option) => {
+    setSortOption(option);
+    
+    if (option === 'default') {
+      setProducts(allProducts);
+      return;
+    }
+
+    try {
+      let sortedData = [];
+      switch (option) {
+        case 'priceAsc':
+          const priceAscRes = await userAPI.sortProductsByPriceAsc();
+          sortedData = priceAscRes.data || [];
+          break;
+        case 'priceDesc':
+          const priceDescRes = await userAPI.sortProductsByPriceDesc();
+          sortedData = priceDescRes.data || [];
+          break;
+        case 'soldAsc':
+          const soldAscRes = await userAPI.sortProductsBySoldAsc();
+          sortedData = soldAscRes.data || [];
+          break;
+        case 'soldDesc':
+          const soldDescRes = await userAPI.sortProductsBySoldDesc();
+          sortedData = soldDescRes.data || [];
+          break;
+        default:
+          sortedData = allProducts;
+      }
+      
+      // Filter only active products
+      const activeSorted = sortedData.filter(p => !p.hidden);
+      setProducts(activeSorted);
+      
+      // If category is selected, filter by category after sorting
+      if (selectedCategoryId) {
+        // The filteredProducts will handle category filtering
+      }
+    } catch (error) {
+      console.error('Error sorting products:', error);
+      // Fallback to client-side sort
+      const currentProducts = selectedCategoryId 
+        ? products.filter(p => p.category?.id === selectedCategoryId)
+        : products;
+      const sorted = [...currentProducts].sort((a, b) => {
+        switch (option) {
+          case 'priceAsc':
+            return a.price - b.price;
+          case 'priceDesc':
+            return b.price - a.price;
+          case 'soldAsc':
+            return (a.soldCount || 0) - (b.soldCount || 0);
+          case 'soldDesc':
+            return (b.soldCount || 0) - (a.soldCount || 0);
+          default:
+            return 0;
+        }
+      });
+      setProducts(sorted);
+    }
+  };
+
+  // Filter products by selected category
+  const getFilteredProducts = () => {
+    if (!selectedCategoryId) {
+      return products;
+    }
+    return products.filter(product => product.category?.id === selectedCategoryId);
+  };
+
+  const filteredProducts = getFilteredProducts();
+
+  const loadCartCount = async (userId) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setCartItemCount(0);
+        return;
+      }
+      const response = await userAPI.getCart(userId);
+      const items = response.data || [];
+      const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+      setCartItemCount(totalCount);
+    } catch (error) {
+      console.error('Error loading cart count:', error);
+      setCartItemCount(0);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
     }
   };
 
@@ -173,29 +345,177 @@ function Home() {
             <span className={styles.logoText}>HomeTech</span>
           </Link>
 
-          <form className={styles.searchForm} onSubmit={handleSearch}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Tìm kiếm sản phẩm..."
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-            />
-            <button type="submit" className={styles.searchButton}>
+          <div className={styles.headerControls}>
+            <div className={styles.newSearchContainer}>
+              <input
+                type="text"
+                className={styles.newSearchInput}
+                placeholder="Tìm kiếm sản phẩm..."
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch(e);
+                  }
+                }}
+              />
+              {isSearching && (
+                <span className={styles.newSearchLoader}>⏳</span>
+              )}
+              {searchKeyword && !isSearching && (
+                <button 
+                  type="button" 
+                  className={styles.newSearchClear}
+                  onClick={handleClearSearch}
+                >
+                  ✕
+                </button>
+              )}
+              <button 
+                type="button"
+                className={styles.newSearchBtn}
+                onClick={handleSearch}
+              >
+                🔍
+              </button>
+            </div>
+            
+            {!searchKeyword.trim() && (
+              <div className={styles.headerSortContainer}>
+                <label className={styles.headerSortLabel}>Sắp xếp:</label>
+                <select 
+                  className={styles.headerSortSelect}
+                  value={sortOption}
+                  onChange={(e) => handleSort(e.target.value)}
+                >
+                  <option value="default">Mặc định</option>
+                  <option value="priceAsc">Giá: Tăng dần</option>
+                  <option value="priceDesc">Giá: Giảm dần</option>
+                  <option value="soldAsc">Lượt bán: Tăng dần</option>
+                  <option value="soldDesc">Lượt bán: Giảm dần</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Category Dropdown Button */}
+          <div className={styles.categoryDropdownContainer}>
+            <button 
+              className={styles.categoryDropdownButton}
+              onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+              onBlur={() => setTimeout(() => setShowCategoryDropdown(false), 200)}
+            >
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <span>Danh mục</span>
+              <svg 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                className={`${styles.dropdownArrow} ${showCategoryDropdown ? styles.dropdownArrowOpen : ''}`}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-          </form>
+            
+            {showCategoryDropdown && categories.length > 0 && (
+              <div className={styles.categoryDropdownMenu}>
+                <button
+                  className={`${styles.categoryDropdownItem} ${!selectedCategoryId ? styles.activeCategory : ''}`}
+                  onClick={handleShowAllProducts}
+                >
+                  Tất cả sản phẩm
+                </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    className={`${styles.categoryDropdownItem} ${selectedCategoryId === category.id ? styles.activeCategory : ''}`}
+                    onClick={() => handleCategoryClick(category.id)}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className={styles.headerActions}>
+            <Link to="/cart" className={styles.cartIcon}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {userInfo && cartItemCount > 0 && (
+                <span className={styles.cartBadge}>{cartItemCount}</span>
+              )}
+            </Link>
             {userInfo ? (
-              <>
-                <span className={styles.username}>{userInfo.username}</span>
-                <button onClick={handleLogout} className={styles.logoutButton}>
-                  Đăng xuất
+              <div className={styles.userMenuContainer}>
+                <button
+                  className={styles.userMenuButton}
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className={styles.userIcon}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className={styles.username}>{userInfo.username}</span>
+                  <svg 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24" 
+                    className={`${styles.dropdownArrow} ${showUserDropdown ? styles.rotated : ''}`}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
-              </>
+                {showUserDropdown && (
+                  <div className={styles.userDropdown}>
+                    <Link 
+                      to="/profile" 
+                      className={styles.dropdownItem}
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>Thông tin cá nhân</span>
+                    </Link>
+                    <Link 
+                      to="/orders" 
+                      className={styles.dropdownItem}
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <span>Đơn hàng của tôi</span>
+                    </Link>
+                    <Link 
+                      to="/favorites" 
+                      className={styles.dropdownItem}
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      <span>Danh sách yêu thích</span>
+                    </Link>
+                    <div className={styles.dropdownDivider}></div>
+                    <button
+                      className={styles.dropdownItem}
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        handleLogout();
+                      }}
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      <span>Đăng xuất</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link to="/login" className={styles.loginButton}>
                 Đăng nhập
@@ -209,29 +529,37 @@ function Home() {
       {categories.length > 0 && (
         <nav className={styles.categoriesNav}>
           <div className={styles.categoriesContent}>
+            <button
+              className={`${styles.categoryLink} ${!selectedCategoryId ? styles.activeCategoryLink : ''}`}
+              onClick={handleShowAllProducts}
+            >
+              Tất cả
+            </button>
             {categories.map((category) => (
-              <Link
+              <button
                 key={category.id}
-                to={`/category/${category.id}`}
-                className={styles.categoryLink}
+                className={`${styles.categoryLink} ${selectedCategoryId === category.id ? styles.activeCategoryLink : ''}`}
+                onClick={() => handleCategoryClick(category.id)}
               >
                 {category.name}
-              </Link>
+              </button>
             ))}
           </div>
         </nav>
       )}
 
       {/* Banner */}
-      <section className={styles.banner}>
-        <div className={styles.bannerContent}>
-          <h1 className={styles.bannerTitle}>Chào mừng đến với HomeTech</h1>
-          <p className={styles.bannerSubtitle}>Thiết bị gia đình thông minh - Chất lượng hàng đầu</p>
-        </div>
-      </section>
+      {!searchKeyword.trim() && (
+        <section className={styles.banner}>
+          <div className={styles.bannerContent}>
+            <h1 className={styles.bannerTitle}>Chào mừng đến với HomeTech</h1>
+            <p className={styles.bannerSubtitle}>Thiết bị gia đình thông minh - Chất lượng hàng đầu</p>
+          </div>
+        </section>
+      )}
 
       {/* Top Selling Products */}
-      {topSelling.length > 0 && (
+      {topSelling.length > 0 && !selectedCategoryId && !searchKeyword.trim() && sortOption === 'default' && (
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Sản phẩm bán chạy</h2>
@@ -299,15 +627,28 @@ function Home() {
       {/* All Products */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Tất cả sản phẩm</h2>
+          <h2 className={styles.sectionTitle}>
+            {searchKeyword.trim() 
+              ? `Kết quả tìm kiếm: "${searchKeyword}"`
+              : selectedCategoryId 
+                ? `${categories.find(c => c.id === selectedCategoryId)?.name || 'Danh mục'}`
+                : sortOption !== 'default'
+                  ? `Tất cả sản phẩm`
+                  : 'Tất cả sản phẩm'}
+          </h2>
+          {searchKeyword.trim() && (
+            <p className={styles.searchResultCount}>
+              Tìm thấy {filteredProducts.length} sản phẩm
+            </p>
+          )}
         </div>
-        {products.length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <div className={styles.emptyState}>
             <p>Không tìm thấy sản phẩm nào</p>
           </div>
         ) : (
           <div className={styles.productsGrid}>
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <Link
                 key={product.id}
                 to={`/product/${product.id}`}

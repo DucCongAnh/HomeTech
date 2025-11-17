@@ -34,7 +34,7 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 50;
 }
 
 .headerContent {
@@ -44,6 +44,8 @@
   display: flex;
   align-items: center;
   gap: 2rem;
+  position: relative;
+  z-index: 1;
 }
 
 .logo {
@@ -53,6 +55,7 @@
   font-weight: 800;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .logoText {
@@ -62,20 +65,316 @@
   background-clip: text;
 }
 
+/* Header Controls Container */
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  max-width: 800px;
+}
+
+/* New Simple Search */
+.newSearchContainer {
+  flex: 1;
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  gap: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.newSearchInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 0.5rem;
+  font-size: 1rem;
+  background: transparent;
+  color: #333;
+  min-width: 0;
+}
+
+.newSearchInput::placeholder {
+  color: #999;
+}
+
+.newSearchLoader {
+  font-size: 1.2rem;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.newSearchClear {
+  background: #e5e7eb;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #666;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.newSearchClear:hover {
+  background: #d1d5db;
+  transform: scale(1.1);
+}
+
+.newSearchBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.newSearchBtn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+/* Header Sort */
+.headerSortContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.headerSortLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+}
+
+.headerSortSelect {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 160px;
+}
+
+.headerSortSelect:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.headerSortSelect:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+}
+
+/* Category Dropdown */
+.categoryDropdownContainer {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 0;
+}
+
+.categoryDropdownButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: fit-content;
+}
+
+.categoryDropdownButton:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.categoryDropdownButton svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dropdownArrow {
+  width: 16px !important;
+  height: 16px !important;
+  transition: transform 0.3s;
+}
+
+.dropdownArrowOpen {
+  transform: rotate(180deg);
+}
+
+.categoryDropdownMenu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 250px;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: dropdownSlideIn 0.3s ease-out;
+  z-index: 1000;
+}
+
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.categoryDropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 1rem 1.5rem;
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.categoryDropdownItem:last-child {
+  border-bottom: none;
+}
+
+.categoryDropdownItem:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding-left: 2rem;
+}
+
+.categoryDropdownItem.activeCategory {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+}
+
 .searchForm {
   flex: 1;
   display: flex;
   max-width: 600px;
   gap: 0.5rem;
+  min-width: 0;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.searchInputWrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 0.5rem;
+  min-width: 0;
+  isolation: isolate;
+  pointer-events: auto;
 }
 
 .searchInput {
   flex: 1;
+  width: 100%;
   padding: 0.75rem 1rem;
+  padding-right: 3rem;
   border: none;
   border-radius: 0.5rem;
   font-size: 1rem;
   outline: none;
+  background: transparent;
+  pointer-events: auto;
+  cursor: text;
+}
+
+.searchSpinner {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.searchSpinner .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e0e0e0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.clearButton {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.clearButton:hover {
+  background: #d1d5db;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.clearButton svg {
+  width: 14px;
+  height: 14px;
+  color: #6b7280;
 }
 
 .searchButton {
@@ -105,10 +404,149 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-shrink: 0;
+  z-index: 0;
+}
+
+.cartIcon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.3s;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cartIcon:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.cartIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.cartBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .username {
   font-weight: 500;
+  color: white;
+}
+
+/* User Menu Dropdown */
+.userMenuContainer {
+  position: relative;
+  z-index: 100;
+}
+
+.userMenuButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+  font-size: 1rem;
+}
+
+.userMenuButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.userIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.dropdownArrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s;
+  flex-shrink: 0;
+}
+
+.dropdownArrow.rotated {
+  transform: rotate(180deg);
+}
+
+.userDropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  overflow: hidden;
+  animation: dropdownSlideIn 0.2s ease-out;
+  z-index: 1000;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dropdownItem:hover {
+  background: #f3f4f6;
+}
+
+.dropdownItem svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #667eea;
+}
+
+.dropdownItem span {
+  flex: 1;
+}
+
+.dropdownDivider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0.25rem 0;
 }
 
 .logoutButton,
@@ -150,17 +588,29 @@
 
 .categoryLink {
   text-decoration: none;
+  background: none;
+  border: none;
   color: #333;
   font-weight: 500;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   transition: all 0.3s;
   white-space: nowrap;
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: inherit;
 }
 
 .categoryLink:hover {
   background: #f0f0f0;
   color: #667eea;
+}
+
+.categoryLink.activeCategoryLink {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 /* Banner */
@@ -198,10 +648,62 @@
   margin-bottom: 2rem;
 }
 
+.sectionTitleContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
 .sectionTitle {
   font-size: 2rem;
   font-weight: 700;
   color: #333;
+  margin: 0;
+}
+
+.sortContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sortLabel {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+
+.sortSelect {
+  padding: 0.5rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 180px;
+}
+
+.sortSelect:hover {
+  border-color: #667eea;
+}
+
+.sortSelect:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.searchResultCount {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  color: #6b7280;
+  font-weight: 500;
 }
 
 /* Products Grid */
@@ -282,6 +784,7 @@
   margin-bottom: 0.5rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -313,9 +816,43 @@
     padding: 1rem;
   }
 
+  .categoryDropdownContainer {
+    width: 100%;
+    order: 2;
+  }
+
+  .categoryDropdownButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .categoryDropdownMenu {
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: calc(100vw - 2rem);
+    max-width: 400px;
+  }
+
+  .newSearchContainer {
+    width: 100%;
+    max-width: none;
+    order: 1;
+  }
+
   .searchForm {
     width: 100%;
     max-width: none;
+    order: 1;
+  }
+
+  .logo {
+    order: 0;
+  }
+
+  .headerActions {
+    order: 3;
+    width: 100%;
+    justify-content: center;
   }
 
   .bannerTitle {

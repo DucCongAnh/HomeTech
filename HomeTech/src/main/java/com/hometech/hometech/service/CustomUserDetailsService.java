@@ -1,6 +1,6 @@
 package com.hometech.hometech.service;
 
-import com.hometech.hometech.Repository.AccountReposirory;
+import com.hometech.hometech.Repository.AccountRepository;
 import com.hometech.hometech.model.Account;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -14,9 +14,9 @@ import java.util.Collections;
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final AccountReposirory accountRepository;
+    private final AccountRepository accountRepository;
 
-    public CustomUserDetailsService(AccountReposirory accountRepository) {
+    public CustomUserDetailsService(AccountRepository accountRepository) {
         this.accountRepository = accountRepository;
     }
 

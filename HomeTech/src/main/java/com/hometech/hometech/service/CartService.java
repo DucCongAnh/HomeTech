@@ -36,14 +36,11 @@ public class CartService {
 
     // Lấy customer theo userId hoặc ném ngoại lệ
     private Customer getCustomerByUserIdOrThrow(Long userId) {
-        // tìm tất cả customer có user.id = userId (nếu repo hỗ trợ list)
-        List<Customer> all = customerRepo.findAllById(userId);
-        if (all != null && !all.isEmpty()) {
-            return all.get(0);
-        }
-        // fallback: try optional findByUser_Id
+        // Customer extends User, nên Customer ID = User ID
         Optional<Customer> opt = customerRepo.findById(userId);
-        if (opt.isPresent()) return opt.get();
+        if (opt.isPresent()) {
+            return opt.get();
+        }
         throw new RuntimeException("Customer not found for userId=" + userId);
     }
 
@@ -69,7 +66,9 @@ public class CartService {
     public List<CartItem> getCartItemsByUserId(Long userId) {
         Customer customer = getCustomerByUserIdOrThrow(userId);
         if (customer.getCart() == null) return List.of();
-        return cartRepo.findByCart(customer.getCart());
+        // findByCart with @EntityGraph will eagerly load product
+        List<CartItem> items = cartRepo.findByCart(customer.getCart());
+        return items;
     }
 
 

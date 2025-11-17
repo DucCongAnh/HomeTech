@@ -117,4 +117,9 @@ public class ReviewService {
     public double getAverageRating(long productId) {
         return reviewRepository.getAverageRating(productId).orElse(0.0);
     }
+
+    // Lấy tất cả đánh giá (cho admin)
+    public List<Review> getAllReviews() {
+        return reviewRepository.findAll();
+    }
 }
