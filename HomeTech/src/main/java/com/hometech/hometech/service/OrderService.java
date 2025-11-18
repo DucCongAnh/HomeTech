@@ -7,18 +7,12 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+import com.hometech.hometech.Repository.*;
+import com.hometech.hometech.dto.PreviewOrderResponse;
+import com.hometech.hometech.model.*;
 import org.springframework.stereotype.Service;
 
-import com.hometech.hometech.Repository.CartItemRepository;
-import com.hometech.hometech.Repository.CustomerRepository;
-import com.hometech.hometech.Repository.OrderItemRepository;
-import com.hometech.hometech.Repository.OrderRepository;
 import com.hometech.hometech.enums.OrderStatus;
-import com.hometech.hometech.model.CartItem;
-import com.hometech.hometech.model.Customer;
-import com.hometech.hometech.model.Order;
-import com.hometech.hometech.model.OrderItem;
-import com.hometech.hometech.model.User;
 
 @Service
 public class OrderService {
@@ -28,62 +22,191 @@ public class OrderService {
     private final CartItemRepository cartRepo;
     private final CustomerRepository customerRepo;
     private final NotifyService notifyService;
+    private final AddressRepository addressRepo;
+    private final VoucherRepository voucherRepo;
+
 
     public OrderService(OrderRepository orderRepo, OrderItemRepository orderItemRepo,
                         CartItemRepository cartRepo, CustomerRepository customerRepo,
-                        NotifyService notifyService) {
+                        NotifyService notifyService,
+                        AddressRepository addressRepo,
+                        VoucherRepository voucherRepo) {
         this.orderRepo = orderRepo;
         this.orderItemRepo = orderItemRepo;
         this.cartRepo = cartRepo;
         this.customerRepo = customerRepo;
         this.notifyService = notifyService;
+        this.addressRepo = addressRepo;
+        this.voucherRepo=voucherRepo;
     }
 
     // 🟢 Tạo đơn hàng từ giỏ hàng của user cụ thể
-    public Order createOrder(Long userId) {
+    public Order createOrder(Long userId, Long addressId, String code) {
+        // (1) Customer
         Customer customer = customerRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
 
-        if (customer.getCart() == null) {
-            throw new RuntimeException("Customer cart not found");
+        // (2) Address
+        Address address = addressRepo.findById(addressId)
+                .orElseThrow(() -> new RuntimeException("Địa chỉ không tồn tại"));
+
+        if (!address.getCustomer().getId().equals(customer.getId())) {
+            throw new RuntimeException("Địa chỉ không thuộc về khách hàng này!");
         }
+
+        // (3) Cart
+        if (customer.getCart() == null)
+            throw new RuntimeException("Customer cart not found");
 
         List<CartItem> cartItems = cartRepo.findByCart(customer.getCart());
-        if (cartItems.isEmpty()) {
+        if (cartItems.isEmpty())
             throw new RuntimeException("Giỏ hàng trống!");
-        }
 
-        double total = 0;
+        // (4) Tính tổng
+        double subtotal = 0;
         List<OrderItem> orderItems = new ArrayList<>();
 
         for (CartItem c : cartItems) {
-            double subtotal = c.getProduct().getPrice() * c.getQuantity();
-            total += subtotal;
+            double itemTotal = c.getProduct().getPrice() * c.getQuantity();
+            subtotal += itemTotal;
 
-            OrderItem orderItem = new OrderItem();
-            orderItem.setProduct(c.getProduct());
-            orderItem.setQuantity(c.getQuantity());
-            orderItem.setPrice(c.getProduct().getPrice());
-            orderItems.add(orderItem);
+            OrderItem oi = new OrderItem();
+            oi.setProduct(c.getProduct());
+            oi.setQuantity(c.getQuantity());
+            oi.setPrice(c.getProduct().getPrice());
+            orderItems.add(oi);
         }
 
+        // (5) Áp dụng voucher nếu có
+        Voucher voucher = null;
+        double discount = 0;
+        double finalTotal = subtotal;
+
+        if (code != null && !code.isBlank()) {
+
+            voucher = voucherRepo.findByCode(code)
+                    .orElseThrow(() -> new RuntimeException("Voucher không tồn tại"));
+
+            // Check status
+            if (!voucher.isActive())
+                throw new RuntimeException("Voucher không hoạt động");
+
+            LocalDateTime now = LocalDateTime.now();
+            if (now.isBefore(voucher.getStartDate()) || now.isAfter(voucher.getEndDate()))
+                throw new RuntimeException("Voucher đã hết hạn");
+
+            if (subtotal < voucher.getMinOrderValue())
+                throw new RuntimeException("Đơn hàng chưa đủ điều kiện áp dụng voucher");
+
+            if (voucher.getUsedCount() >= voucher.getUsageLimit())
+                throw new RuntimeException("Voucher đã đạt số lần sử dụng tối đa");
+
+            // Tính giảm
+            if (voucher.getDiscountPercent() != null)
+                discount += subtotal * (voucher.getDiscountPercent() / 100);
+
+            if (voucher.getDiscountAmount() != null)
+                discount += voucher.getDiscountAmount();
+
+            // Không vượt tổng
+            discount = Math.min(discount, subtotal);
+
+            finalTotal = subtotal - discount;
+
+            // Update số lần dùng
+            voucher.setUsedCount(voucher.getUsedCount() + 1);
+            voucherRepo.save(voucher);
+        }
+
+        // (6) Tạo Order
         Order order = new Order();
         order.setCustomer(customer);
-        order.setTotalAmount(total);
+        order.setDeliveryAddress(address);
+        order.setTotalAmount(finalTotal);
         order.setStatus(OrderStatus.WAITING_CONFIRMATION);
-        order.setItems(orderItems);
         order.setCreatedAt(LocalDateTime.now());
+        order.setVoucher(voucher);   // ⬅ ⬅ Gắn voucher vào Order
+        order.setItems(orderItems);
 
-        orderItems.forEach(item -> item.setOrder(order));
+        orderItems.forEach(i -> i.setOrder(order));
 
+        // (7) Lưu DB
         orderRepo.save(order);
         orderItemRepo.saveAll(orderItems);
+
+        // (8) Xóa cart sau khi tạo đơn
         cartRepo.deleteAll(cartItems);
 
         return order;
     }
 
-    // 🆕 Tạo đơn hàng cho khách (guest)
+    public PreviewOrderResponse previewOrder(Long userId, String voucherCode) {
+        Customer customer = customerRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+        List<CartItem> cartItems = cartRepo.findByCart(customer.getCart());
+        if (cartItems.isEmpty()) {
+            throw new RuntimeException("Giỏ hàng trống");
+        }
+
+        double subtotal = cartItems.stream()
+                .mapToDouble(c -> c.getProduct().getPrice() * c.getQuantity())
+                .sum();
+
+        double discount = 0;
+        boolean voucherValid = false;
+        String message = "Không sử dụng voucher";
+
+        if (voucherCode != null && !voucherCode.isBlank()) {
+            try {
+                Voucher voucher = voucherRepo.findByCode(voucherCode)
+                        .orElseThrow(() -> new RuntimeException("Voucher không hợp lệ"));
+
+                validateVoucher(voucher, subtotal);
+                discount = calculateDiscount(subtotal, voucher);
+
+                voucherValid = true;
+                message = "Áp dụng voucher thành công";
+
+            } catch (RuntimeException e) {
+                voucherValid = false;
+                message = e.getMessage();
+            }
+        }
+
+        double finalTotal = subtotal - discount;
+        if (finalTotal < 0) finalTotal = 0;
+
+        return new PreviewOrderResponse(
+                subtotal,
+                discount,
+                finalTotal,
+                voucherValid,
+                message
+        );
+    }
+    private void validateVoucher(Voucher voucher, double subtotal) {
+        if (!voucher.isActive()) throw new RuntimeException("Voucher không còn hiệu lực");
+        if (voucher.getUsageLimit() != null &&
+                voucher.getUsedCount() >= voucher.getUsageLimit())
+            throw new RuntimeException("Voucher đã hết lượt sử dụng");
+        if (subtotal < voucher.getMinOrderValue())
+            throw new RuntimeException("Đơn hàng chưa đạt giá trị tối thiểu");
+        if (voucher.getStartDate().isAfter(LocalDateTime.now()) ||
+                voucher.getEndDate().isBefore(LocalDateTime.now()))
+            throw new RuntimeException("Voucher đã hết hạn");
+    }
+    private double calculateDiscount(double subtotal, Voucher voucher) {
+        if (voucher.getDiscountPercent() != null) {
+            return subtotal * voucher.getDiscountPercent() / 100;
+        }
+        if (voucher.getDiscountAmount() != null) {
+            return voucher.getDiscountAmount();
+        }
+        return 0;
+    }
+
+
 
 
     // 🟡 Cập nhật trạng thái đơn hàng

@@ -1,4 +1,6 @@
 package com.hometech.hometech.model;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hometech.hometech.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -7,10 +9,11 @@ import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 @Entity
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "orders")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+
 public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,9 +25,11 @@ public class Order {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id")
+    @JsonIgnore
     private Customer customer;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+//    @JsonIgnore
     private List<OrderItem> items;
 
     public Payment getPayment() {
@@ -84,6 +89,33 @@ public class Order {
     }
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Payment payment;
+
+    public Voucher getVoucher() {
+        return voucher;
+    }
+
+    public void setVoucher(Voucher voucher) {
+        this.voucher = voucher;
+    }
+
+    public Address getDeliveryAddress() {
+        return deliveryAddress;
+    }
+
+    public void setDeliveryAddress(Address deliveryAddress) {
+        this.deliveryAddress = deliveryAddress;
+    }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "voucher_id")
+    @JsonIgnore
+    private Voucher voucher;
+
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "address_id") // Khóa ngoại đến Address
+    @JsonIgnore
+    private Address deliveryAddress;
 }
 

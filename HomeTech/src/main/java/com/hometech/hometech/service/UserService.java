@@ -1,6 +1,6 @@
 package com.hometech.hometech.service;
 
-import com.hometech.hometech.Repository.AccountRepository;
+import com.hometech.hometech.Repository.AccountReposirory;
 import com.hometech.hometech.enums.RoleType;
 import com.hometech.hometech.model.Account;
 import com.hometech.hometech.model.User;
@@ -14,11 +14,11 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final AccountRepository accountRepository;
+    private final AccountReposirory accountReposirory;
 
-    public UserService(UserRepository userRepository, AccountRepository accountRepository) {
+    public UserService(UserRepository userRepository, AccountReposirory accountReposirory) {
         this.userRepository = userRepository;
-        this.accountRepository = accountRepository;
+        this.accountReposirory = accountReposirory;
     }
 
     // Lấy danh sách tất cả người dùng
@@ -37,13 +37,13 @@ public class UserService {
         }
 
         account.setEnabled(enable);
-        accountRepository.save(account);
+        accountReposirory.save(account);
     }
     public void updateUserRole(Long id, RoleType roleName) {
-        Account account = accountRepository.findById(id)
+        Account account = accountReposirory.findById(id)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
         account.setRole(roleName);
-        accountRepository.save(account);
+        accountReposirory.save(account);
     }
     public User getById(long id) {
         Optional<User> userOpt = userRepository.findById(id);

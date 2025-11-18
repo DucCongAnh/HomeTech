@@ -11,7 +11,6 @@ import java.util.List;
 public interface UserRepository extends JpaRepository<User, Long> {
     User findByGoogleId(String googleId);
     User findByAccount(Account account);
-    User findByAccount_Username(String username);
     List<User> findByFullNameContainingIgnoreCaseOrAccount_EmailContainingIgnoreCase(String fullName, String email);
 
 }

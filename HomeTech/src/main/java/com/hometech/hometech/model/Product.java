@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})  // 🔥 THÊM DÒNG NÀY
@@ -22,6 +21,16 @@ public class Product {
     private String name;
     private double price;
     private int stock;
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    private String description;
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

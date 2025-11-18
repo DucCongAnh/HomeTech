@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public abstract class User {
@@ -111,6 +110,7 @@ public abstract class User {
     @Column(unique = true)
     private String googleId;
 
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Account account;
 }

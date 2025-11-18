@@ -87,87 +87,79 @@ public class SecurityConfig {
         return source;
     }
 
-    // 🔥 Chain 1: API - Stateless, JWT, no redirects (returns 401 JSON for unauth if needed)
+    // 🔥 CHAIN 1: API (JWT - Stateless)
     @Bean
-    @Order(1)
     public SecurityFilterChain apiFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher("/api/**")  // Only apply to /api/**
+                .securityMatcher("/api/**")
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**", "/api/products/**").permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll() // ✅ Cho phép tất cả request API
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)  // No sessions for API
-                )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setContentType("application/json");
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getOutputStream().println("{ \"error\": \"Unauthorized - Invalid or missing JWT\" }");
-                        })
-                )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .authenticationProvider(authenticationProvider());
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                );
+
+        // Tạm thời không cần filter JWT
+        // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 🔥 Chain 2: Web - Session-based, form login with redirects
-    @Bean
-    @Order(2)
-    public SecurityFilterChain webFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/", "/home",
-                                "/auth/**",
-                                "/oauth2/**",
-                                "/api/reviews/**",
-                                "/api/reviews/*/hide",
-                                "/api/reviews/*/show",
-                                "/admin/login", "/admin/register",
-                                "/css/**", "/js/**", "/images/**",
-                                "/ws/**", "/api/notify/**", "/api/notifications/**",  // Move to API chain if truly stateless
-                                "/test-notification", "/websocket-test"
-                        ).permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                )
-                .formLogin(form -> form
-                        .loginPage("/auth/login")
-                        .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/", true)
-                        .failureUrl("/auth/login?error=true")
-                        .permitAll()
-                )
-                .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/auth/login")
-                        .authorizationEndpoint(authz -> authz
-                                .baseUri("/oauth2/authorization")
-                        )
-                        .userInfoEndpoint(user -> user.userService(oAuth2UserService))
-                        .successHandler(oAuth2LoginSuccessHandler)
-                )
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/auth/login?logout=true")
-                        .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID")
-                        .permitAll()
-                )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/auth/login"))
-                )
-                .authenticationProvider(authenticationProvider());
 
-        return http.build();
-    }
+
+
+    // 🔥 CHAIN 2: WEB (Session + Login Redirect)
+//    @Bean
+//    @Order(2)
+//    public SecurityFilterChain webFilterChain(HttpSecurity http) throws Exception {
+//        http
+//                .csrf(csrf -> csrf.disable())
+//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+//                .authorizeHttpRequests(auth -> auth
+//                        .requestMatchers(
+//                                "/", "/home",
+//                                "/auth/**",
+//                                "/oauth2/**",
+//                                "/admin/login", "/admin/register",
+//                                "/css/**", "/js/**", "/images/**",
+//                                "/ws/**",
+//                                "/test-notification", "/websocket-test"
+//                        ).permitAll()
+//
+//                        .requestMatchers("/admin/**").hasRole("ADMIN")
+//
+//                        .anyRequest().authenticated()
+//                )
+//                .sessionManagement(session -> session
+//                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+//                )
+//                .formLogin(form -> form
+//                        .loginPage("/auth/login")
+//                        .loginProcessingUrl("/login")
+//                        .defaultSuccessUrl("/", true)
+//                        .failureUrl("/auth/login?error=true")
+//                        .permitAll()
+//                )
+//                .oauth2Login(oauth2 -> oauth2
+//                        .loginPage("/auth/login")
+//                        .authorizationEndpoint(authz -> authz.baseUri("/oauth2/authorization"))
+//                        .userInfoEndpoint(user -> user.userService(oAuth2UserService))
+//                        .successHandler(oAuth2LoginSuccessHandler)
+//                )
+//                .logout(logout -> logout
+//                        .logoutUrl("/logout")
+//                        .logoutSuccessUrl("/auth/login?logout=true")
+//                        .invalidateHttpSession(true)
+//                        .deleteCookies("JSESSIONID")
+//                        .permitAll()
+//                )
+//                .exceptionHandling(ex -> ex
+//                        .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/auth/login"))
+//                )
+//                .authenticationProvider(authenticationProvider());
+//
+//        return http.build();
+//    }
 }

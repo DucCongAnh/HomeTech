@@ -1,6 +1,5 @@
 package com.hometech.hometech.controller.Api;
 
-import com.hometech.hometech.dto.CartItemDTO;
 import com.hometech.hometech.model.CartItem;
 import com.hometech.hometech.service.CartService;
 import org.springframework.http.HttpStatus;
@@ -10,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -48,11 +46,7 @@ public class CartRestController {
     @GetMapping("/user/{userId}")
     public ResponseEntity<Map<String, Object>> getCartByUserId(@PathVariable Long userId) {
         List<CartItem> items = service.getCartItemsByUserId(userId);
-        // Convert to DTO to include product information
-        List<CartItemDTO> itemDTOs = items.stream()
-                .map(CartItemDTO::new)
-                .collect(Collectors.toList());
-        return buildResponse(true, "Lấy giỏ hàng của user thành công", itemDTOs, null, HttpStatus.OK);
+        return buildResponse(true, "Lấy giỏ hàng của user thành công", items, null, HttpStatus.OK);
     }
 
     // 🟢 Thêm sản phẩm vào giỏ
@@ -67,30 +61,26 @@ public class CartRestController {
 
     // 🟢 Tăng số lượng
     @PutMapping("/increase/{userId}/{id}")
-    public ResponseEntity<Map<String, Object>> increase(@PathVariable Long userId, @PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> increase(@PathVariable Long userId, @PathVariable int id) {
         CartItem updated = service.increaseQuantity(userId, id);
         if (updated == null) {
             return buildResponse(false, "Không tìm thấy item", null, "Item not found", HttpStatus.NOT_FOUND);
         }
-        // Convert to DTO to include product information
-        CartItemDTO dto = new CartItemDTO(updated);
-        return buildResponse(true, "Tăng số lượng thành công", dto, null, HttpStatus.OK);
+        return buildResponse(true, "Tăng số lượng thành công", updated, null, HttpStatus.OK);
     }
 
     // 🟢 Giảm số lượng
     @PutMapping("/decrease/{userId}/{id}")
-    public ResponseEntity<Map<String, Object>> decrease(@PathVariable Long userId, @PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> decrease(@PathVariable Long userId, @PathVariable int id) {
         CartItem updated = service.decreaseQuantity(userId, id);
         if (updated == null) {
             return buildResponse(false, "Không tìm thấy item", null, "Item not found", HttpStatus.NOT_FOUND);
         }
-        // Convert to DTO to include product information
-        CartItemDTO dto = new CartItemDTO(updated);
-        return buildResponse(true, "Giảm số lượng thành công", dto, null, HttpStatus.OK);
+        return buildResponse(true, "Giảm số lượng thành công", updated, null, HttpStatus.OK);
     }
 
     @DeleteMapping("/remove/{userId}/{id}")
-    public ResponseEntity<Map<String, Object>> remove(@PathVariable Long userId, @PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> remove(@PathVariable Long userId, @PathVariable int id) {
 
         service.removeItem(userId, id);
 

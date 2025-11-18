@@ -1,43 +1,41 @@
 package com.hometech.hometech.config;
 
-import com.hometech.hometech.Repository.AccountRepository;
+import com.hometech.hometech.Repository.AccountReposirory;
 import com.hometech.hometech.Repository.CustomerRepository;
+import com.hometech.hometech.Repository.UserRepository;
 import com.hometech.hometech.enums.RoleType;
 import com.hometech.hometech.model.Account;
+import com.hometech.hometech.model.Cart;
 import com.hometech.hometech.model.Customer;
-import com.hometech.hometech.service.CustomUserDetailsService;
-import com.hometech.hometech.service.JwtService;
+import com.hometech.hometech.service.CartService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 @Component
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
-    private final AccountRepository accountRepository;
+    private final AccountReposirory accountRepository;
+    private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
-    private final CustomUserDetailsService userDetailsService;
-    private final JwtService jwtService;
+    private final CartService cartService;
 
-    public OAuth2LoginSuccessHandler(AccountRepository accountRepository,
+    public OAuth2LoginSuccessHandler(AccountReposirory accountRepository,
+                                     UserRepository userRepository,
                                      CustomerRepository customerRepository,
-                                     CustomUserDetailsService userDetailsService,
-                                     JwtService jwtService) {
+                                     CartService cartService) {
         this.accountRepository = accountRepository;
+        this.userRepository = userRepository;
         this.customerRepository = customerRepository;
-        this.userDetailsService = userDetailsService;
-        this.jwtService = jwtService;
+        this.cartService = cartService;
     }
 
     @Override
@@ -105,23 +103,6 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         System.out.println("   - User ID: " + customer.getId());
         System.out.println("   - Account.user_id: " + (account.getUser() != null ? account.getUser().getId() : "NULL"));
 
-        // Tạo JWT token cho user
-        try {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(account.getUsername());
-            String accessToken = jwtService.generateToken(userDetails);
-            String refreshToken = jwtService.generateRefreshToken(userDetails);
-
-            // Redirect về frontend với token trong URL (sử dụng hash để bảo mật hơn)
-            String frontendUrl = String.format(
-                "http://localhost:5173/oauth2/callback?token=%s&refreshToken=%s",
-                URLEncoder.encode(accessToken, StandardCharsets.UTF_8),
-                URLEncoder.encode(refreshToken, StandardCharsets.UTF_8)
-            );
-            response.sendRedirect(frontendUrl);
-        } catch (Exception e) {
-            System.err.println("❌ Lỗi khi tạo JWT token: " + e.getMessage());
-            // Fallback: redirect về frontend không có token, frontend sẽ tự gọi API
-            response.sendRedirect("http://localhost:5173/oauth2/callback");
-        }
+        response.sendRedirect("http://localhost:8080/");
     }
 }

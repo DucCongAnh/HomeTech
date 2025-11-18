@@ -112,21 +112,8 @@ public class CategoryRestController {
     // 🟢 Tạo danh mục mới
     @PostMapping
     public ResponseEntity<Map<String, Object>> createCategory(@RequestBody Category category) {
-        try {
-            // Validate category name
-            if (category == null || category.getName() == null || category.getName().trim().isEmpty()) {
-                return buildResponse(false, "Tên danh mục không được để trống", null, 
-                        "Category name is required", HttpStatus.BAD_REQUEST);
-            }
-            
-            categoryService.save(category);
-            return buildResponse(true, "Tạo danh mục thành công", category, null, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            return buildResponse(false, e.getMessage(), null, e.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            return buildResponse(false, "Có lỗi khi tạo danh mục: " + e.getMessage(), null, 
-                    e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        categoryService.save(category);
+        return buildResponse(true, "Tạo danh mục thành công", category, null, HttpStatus.OK);
     }
 
     // 🟢 Cập nhật danh mục

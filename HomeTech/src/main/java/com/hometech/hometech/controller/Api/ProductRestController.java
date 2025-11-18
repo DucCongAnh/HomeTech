@@ -1,6 +1,5 @@
 package com.hometech.hometech.controller.Api;
 
-import com.hometech.hometech.dto.ProductImageDTO;
 import com.hometech.hometech.model.Category;
 import com.hometech.hometech.model.Product;
 import com.hometech.hometech.model.ProductImage;
@@ -43,10 +42,10 @@ public class ProductRestController {
         return ResponseEntity.status(status).body(res);
     }
 
-    // 🟢 Lấy tất cả sản phẩm (chỉ active - hidden = false)
+    // 🟢 Lấy tất cả sản phẩm
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllProducts() {
-        List<Product> products = productService.getAllActive();
+        List<Product> products = productService.getAll();
         return buildResponse(true, "Lấy danh sách sản phẩm thành công", products, null, HttpStatus.OK);
     }
 
@@ -213,11 +212,7 @@ public class ProductRestController {
     @GetMapping("/{productId}/images")
     public ResponseEntity<Map<String, Object>> getImages(@PathVariable Long productId) {
         List<ProductImage> images = productImageService.getImages(productId);
-        // Convert ProductImage to DTO với base64 string
-        List<ProductImageDTO> imageDTOs = images.stream()
-                .map(ProductImageDTO::new)
-                .toList();
-        return buildResponse(true, "Lấy danh sách ảnh thành công", imageDTOs, null, HttpStatus.OK);
+        return buildResponse(true, "Lấy danh sách ảnh thành công", images, null, HttpStatus.OK);
     }
 
     @DeleteMapping("/images/{imageId}")

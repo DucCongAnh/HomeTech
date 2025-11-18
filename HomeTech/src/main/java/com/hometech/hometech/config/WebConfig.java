@@ -19,7 +19,8 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/api/**",
-                        "/api/products/**",// 🔥 Phải có dòng này
+                        "/api/products/**",// 🔥 Phải có dòng này,
+                        "/api/orders/**",
                         "/oauth2/**",
                         "/css/**", "/js/**", "/images/**"
                 );

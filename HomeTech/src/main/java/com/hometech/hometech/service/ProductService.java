@@ -23,14 +23,9 @@ public class ProductService {
     public Product save(Product product) {
         return productRepository.save(product);
     }
-    // 🟢 Lấy toàn bộ sản phẩm (bao gồm cả hidden - chỉ dùng cho admin)
+    // 🟢 Lấy toàn bộ sản phẩm
     public List<Product> getAll() {
         return productRepository.findAll();
-    }
-
-    // 🟢 Lấy tất cả sản phẩm active (hidden = false)
-    public List<Product> getAllActive() {
-        return productRepository.findByHiddenFalse();
     }
 
     // 🟢 Lấy sản phẩm theo ID
@@ -99,50 +94,41 @@ public class ProductService {
         return productRepository.findByCategoryAndHidden(category, false);
     }
 
-    // 🟢 Lấy sản phẩm mới thêm trong 7 ngày qua (chỉ active)
+    // 🟢 Lấy sản phẩm mới thêm trong 7 ngày qua
     public List<Product> getProductsAddedInLast7Days() {
         LocalDateTime lastWeek = LocalDateTime.now().minusDays(7);
-        List<Product> products = productRepository.findByCreatedAtAfter(lastWeek);
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findByCreatedAtAfter(lastWeek);
     }
 
-    // 🟢 Lấy top 10 sản phẩm bán chạy nhất (chỉ active)
+    // 🟢 Lấy top 10 sản phẩm bán chạy nhất
     public List<Product> getTop10BestSellingProducts() {
-        List<Product> products = productRepository.findTop10ByOrderBySoldCountDesc();
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findTop10ByOrderBySoldCountDesc();
     }
 
-    // 🟢 Lấy top 10 sản phẩm bán chạy nhất theo tên danh mục (chỉ active)
+    // 🟢 Lấy top 10 sản phẩm bán chạy nhất theo tên danh mục
     public List<Product> getTop10BestSellingProductsByCategory(String categoryName) {
-        List<Product> products = productRepository.findTop10ByCategory_NameOrderBySoldCountDesc(categoryName);
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findTop10ByCategory_NameOrderBySoldCountDesc(categoryName);
     }
 
-    // 🔎 Search products by keyword in name (chỉ active)
+    // 🔎 Search products by keyword in name
     public List<Product> searchByName(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) return getAllActive();
-        List<Product> products = productRepository.findByNameContainingIgnoreCase(keyword.trim());
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        if (keyword == null || keyword.trim().isEmpty()) return getAll();
+        return productRepository.findByNameContainingIgnoreCase(keyword.trim());
     }
     public List<Product> sortByPriceAsc() {
-        List<Product> products = productRepository.findAllByOrderByPriceAsc();
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findAllByOrderByPriceAsc();
     }
     public List<Product> sortByPriceDesc() {
-        List<Product> products = productRepository.findAllByOrderByPriceDesc();
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findAllByOrderByPriceDesc();
     }
     public List<Product> sortBySoldAsc() {
-        List<Product> products = productRepository.findAllByOrderBySoldCountAsc();
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findAllByOrderBySoldCountAsc();
     }
     public List<Product> sortBySoldDesc() {
-        List<Product> products = productRepository.findAllByOrderBySoldCountDesc();
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findAllByOrderBySoldCountDesc();
     }
     public List<Product> sortByNewest() {
-        List<Product> products = productRepository.findAllByOrderByCreatedAtDesc();
-        return products.stream().filter(p -> !p.isHidden()).toList();
+        return productRepository.findAllByOrderByCreatedAtDesc();
     }
 
 }

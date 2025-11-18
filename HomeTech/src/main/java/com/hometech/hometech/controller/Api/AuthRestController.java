@@ -76,19 +76,17 @@ public class AuthRestController {
 
 
     @GetMapping("/verify-email")
-    public void verifyEmail(@RequestParam("token") String token, 
-                           HttpServletResponse httpResponse) throws IOException {
+    public ResponseEntity<Map<String, Object>> verifyEmail(@RequestParam("token") String token) {
+        Map<String, Object> response = new HashMap<>();
         try {
             String message = authService.verifyEmail(token);
-            // Redirect về trang đăng nhập frontend với thông báo thành công
-            String frontendUrl = "http://localhost:5173/login?verified=true&message=" + 
-                java.net.URLEncoder.encode(message, java.nio.charset.StandardCharsets.UTF_8);
-            httpResponse.sendRedirect(frontendUrl);
+            response.put("success", true);
+            response.put("message", message);
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            // Redirect về trang đăng nhập với thông báo lỗi
-            String frontendUrl = "http://localhost:5173/login?verified=false&error=" + 
-                java.net.URLEncoder.encode(e.getMessage(), java.nio.charset.StandardCharsets.UTF_8);
-            httpResponse.sendRedirect(frontendUrl);
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 
@@ -122,19 +120,15 @@ public class AuthRestController {
         try {
             AuthService.AuthResponse authResponse = authService.loginAdmin(request.getUsernameOrEmail(), request.getPassword());
 
-            Map<String, Object> dataMap = new HashMap<>();
-            dataMap.put("accessToken", authResponse.getAccessToken());
-            dataMap.put("refreshToken", authResponse.getRefreshToken());
-            dataMap.put("username", authResponse.getUsername());
-            dataMap.put("email", authResponse.getEmail());
-            dataMap.put("role", authResponse.getRole());
-            if (authResponse.getAdminId() != null) {
-                dataMap.put("adminId", authResponse.getAdminId());
-            }
-            
             response.put("success", true);
             response.put("message", authResponse.getMessage());
-            response.put("data", dataMap);
+            response.put("data", Map.of(
+                    "accessToken", authResponse.getAccessToken(),
+                    "refreshToken", authResponse.getRefreshToken(),
+                    "username", authResponse.getUsername(),
+                    "email", authResponse.getEmail(),
+                    "role", authResponse.getRole()
+            ));
 
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
@@ -341,27 +335,16 @@ public class AuthRestController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
 
-        // Tìm User từ username để lấy id
-        User user = userRepository.findByAccount_Username(userDetails.getUsername());
-        
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("username", userDetails.getUsername());
-        userData.put("authorities", userDetails.getAuthorities());
-        userData.put("enabled", userDetails.isEnabled());
-        userData.put("accountNonExpired", userDetails.isAccountNonExpired());
-        userData.put("accountNonLocked", userDetails.isAccountNonLocked());
-        userData.put("credentialsNonExpired", userDetails.isCredentialsNonExpired());
-        
-        // Thêm id nếu tìm thấy user
-        if (user != null) {
-            userData.put("id", user.getId());
-            userData.put("fullName", user.getFullName());
-            userData.put("email", user.getAccount() != null ? user.getAccount().getEmail() : null);
-        }
-
         response.put("success", true);
         response.put("message", "Lấy thông tin user thành công");
-        response.put("data", userData);
+        response.put("data", Map.of(
+                "username", userDetails.getUsername(),
+                "authorities", userDetails.getAuthorities(),
+                "enabled", userDetails.isEnabled(),
+                "accountNonExpired", userDetails.isAccountNonExpired(),
+                "accountNonLocked", userDetails.isAccountNonLocked(),
+                "credentialsNonExpired", userDetails.isCredentialsNonExpired()
+        ));
 
         return ResponseEntity.ok(response);
     }

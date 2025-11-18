@@ -5,14 +5,16 @@ import java.util.Date;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+
 public class Customer extends User {
     private int loyaltyPoints;
     private Date dateOfBirth;
@@ -24,20 +26,19 @@ public class Customer extends User {
     @JsonIgnore
     private Cart cart;
 
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "customer",
+            cascade = {CascadeType.PERSIST, CascadeType.MERGE},
+            fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Order> orders;
 
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
 
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Review> reviews;
 
-    public List<Message> getMessages() {
-        return messages;
-    }
 
-    public void setMessages(List<Message> messages) {
-        this.messages = messages;
-    }
+
 
     public List<Review> getReviews() {
         return reviews;
@@ -87,7 +88,9 @@ public class Customer extends User {
         this.loyaltyPoints = loyaltyPoints;
     }
 
-    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Message> messages;
+
+    @OneToMany(mappedBy = "customer")
+    @JsonIgnore
+    private List<Chat> chats;
 }
 

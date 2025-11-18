@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import jakarta.persistence.Id;
 
 @Entity
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductImage {

@@ -1,6 +1,6 @@
 package com.hometech.hometech.controller.Api;
 
-import com.hometech.hometech.Repository.AccountRepository;
+import com.hometech.hometech.Repository.AccountReposirory;
 import com.hometech.hometech.Repository.UserRepository;
 import com.hometech.hometech.model.Account;
 import com.hometech.hometech.model.Notify;
@@ -29,12 +29,12 @@ public class NotificationController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final NotifyService notifyService;
-    private final AccountRepository accountRepository;
+    private final AccountReposirory accountRepository;
     private final UserRepository userRepository;
 
     public NotificationController(SimpMessagingTemplate messagingTemplate,
                                  NotifyService notifyService,
-                                 AccountRepository accountRepository,
+                                 AccountReposirory accountRepository,
                                  UserRepository userRepository) {
         this.messagingTemplate = messagingTemplate;
         this.notifyService = notifyService;
@@ -42,7 +42,6 @@ public class NotificationController {
         this.userRepository = userRepository;
     }
 
-    @Data
 
     public static class Notification {
         public String getMessage() {

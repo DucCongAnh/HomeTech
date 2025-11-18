@@ -23,7 +23,7 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
-    private final AccountRepository accountRepository;
+    private final AccountReposirory accountRepository;
     private final TokenForgetPasswordRepository tokenForgetPasswordRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -34,7 +34,7 @@ public class AuthService {
     private final AdminRepository adminRepository;
     private final GoogleVerifierService googleVerifierService;
 
-    public AuthService(AccountRepository accountRepository,
+    public AuthService(AccountReposirory accountRepository,
                        TokenForgetPasswordRepository tokenForgetPasswordRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
@@ -208,16 +208,6 @@ public class AuthService {
             throw new RuntimeException("Bạn không có quyền truy cập trang quản trị.");
         }
         response.setMessage("Đăng nhập admin thành công"); // BÂY GIỜ HỢP LỆ
-        
-        // Lấy adminId
-        Account account = accountRepository.findByUsername(usernameOrEmail)
-                .or(() -> accountRepository.findByEmail(usernameOrEmail))
-                .orElse(null);
-        if (account != null && account.getUser() instanceof Admin) {
-            Admin admin = (Admin) account.getUser();
-            response.setAdminId(admin.getId());
-        }
-        
         return response;
     }
 
@@ -383,16 +373,6 @@ public class AuthService {
             this.message = message;
         }
 
-        public AuthResponse(String accessToken, String refreshToken, String username, String email, String role, String message, Long adminId) {
-            this.accessToken = accessToken;
-            this.refreshToken = refreshToken;
-            this.username = username;
-            this.email = email;
-            this.role = role;
-            this.message = message;
-            this.adminId = adminId;
-        }
-
 
         public String getUsername() {
             return username;
@@ -446,14 +426,5 @@ public class AuthService {
         private String email;
         private String role;
         private String message;
-        private Long adminId;
-
-        public Long getAdminId() {
-            return adminId;
-        }
-
-        public void setAdminId(Long adminId) {
-            this.adminId = adminId;
-        }
     }
 }

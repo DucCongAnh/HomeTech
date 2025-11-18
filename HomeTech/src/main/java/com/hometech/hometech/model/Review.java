@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Review {
@@ -33,8 +32,9 @@ public class Review {
     @JsonIgnore
     private Customer customer;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
+    @JsonIgnore
     private Product product;
 
     @Column(nullable = false)

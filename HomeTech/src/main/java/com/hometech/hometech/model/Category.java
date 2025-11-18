@@ -8,7 +8,6 @@ import lombok.*;
 import java.util.List;
 
 @Entity
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})  // 🔥 THÊM DÒNG NÀY
@@ -44,18 +43,7 @@ public class Category {
 
     private String name;
 
-    @Column(nullable = false)
-    private boolean hidden = false; // mặc định là không ẩn
-
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Product> products;
-    
-    public boolean isHidden() {
-        return hidden;
-    }
-
-    public void setHidden(boolean hidden) {
-        this.hidden = hidden;
-    }
 }

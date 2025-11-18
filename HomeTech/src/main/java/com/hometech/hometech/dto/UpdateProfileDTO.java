@@ -2,7 +2,6 @@ package com.hometech.hometech.dto;
 
 import lombok.Data;
 
-@Data
 public class UpdateProfileDTO {
     private String fullName;
     private String phone;
