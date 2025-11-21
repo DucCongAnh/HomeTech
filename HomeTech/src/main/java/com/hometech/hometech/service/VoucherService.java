@@ -1,8 +1,7 @@
 package com.hometech.hometech.service;
 
-import com.hometech.hometech.model.Voucher;
 import com.hometech.hometech.Repository.VoucherRepository;
-import lombok.RequiredArgsConstructor;
+import com.hometech.hometech.model.Voucher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,6 +18,9 @@ public class VoucherService {
 
 
     public Voucher create(Voucher voucher) {
+        if (voucher.getUsedCount() == null || voucher.getUsedCount() < 0) {
+            voucher.setUsedCount(0);
+        }
         return voucherRepository.save(voucher);
     }
 
@@ -34,6 +36,9 @@ public class VoucherService {
         voucher.setStartDate(updated.getStartDate());
         voucher.setEndDate(updated.getEndDate());
         voucher.setActive(updated.isActive());
+        if (updated.getUsedCount() != null && updated.getUsedCount() >= 0) {
+            voucher.setUsedCount(updated.getUsedCount());
+        }
 
         return voucherRepository.save(voucher);
     }

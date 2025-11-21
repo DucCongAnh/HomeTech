@@ -176,6 +176,27 @@ export const adminAPI = {
     return response.data;
   },
 
+  // Vouchers
+  getAllVouchers: async () => {
+    const response = await api.get('/vouchers');
+    return response.data;
+  },
+
+  createVoucher: async (voucher) => {
+    const response = await api.post('/vouchers', voucher);
+    return response.data;
+  },
+
+  updateVoucher: async (id, voucher) => {
+    const response = await api.put(`/vouchers/${id}`, voucher);
+    return response.data;
+  },
+
+  deleteVoucher: async (id) => {
+    const response = await api.delete(`/vouchers/${id}`);
+    return response.data;
+  },
+
 // =================== BỔ SUNG VÀO userAPI (nếu người dùng cần xem đơn hàng của mình) ===================
 
   // User xem danh sách đơn hàng của mình

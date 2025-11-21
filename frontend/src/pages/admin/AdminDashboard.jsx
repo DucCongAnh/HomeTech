@@ -7,6 +7,7 @@ import CategoriesManagement from './CategoriesManagement';
 import ReviewsManagement from './ReviewsManagement';
 import UsersManagement from './UsersManagement';
 import ProductsManagement from './ProductsManagement';
+import VouchersManagement from './VouchersManagement';
 import styles from './AdminDashboard.module.css';
 
 function AdminDashboard() {
@@ -68,6 +69,8 @@ function AdminDashboard() {
         return <UsersManagement />;
       case 'products':
         return <ProductsManagement />;
+      case 'vouchers':
+        return <VouchersManagement />;
       default:
         return <Dashboard />;
     }
@@ -111,6 +114,16 @@ function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
             <span>Sản phẩm</span>
+          </button>
+
+          <button
+            className={`${styles.navItem} ${activeTab === 'vouchers' ? styles.active : ''}`}
+            onClick={() => setActiveTab('vouchers')}
+          >
+            <svg className={styles.navIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Voucher</span>
           </button>
 
           <button
