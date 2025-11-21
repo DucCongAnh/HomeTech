@@ -25,7 +25,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowedHeaders = "*")
 public class AuthRestController {
 
     private final AuthService authService;

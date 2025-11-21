@@ -132,6 +132,93 @@ export const authAPI = {
 // Admin API
 export const adminAPI = {
   // Orders
+  // Lấy tất cả đơn hàng của admin (nếu bạn đã thêm endpoint /admin/all)
+  getAllOrdersAdmin: async () => {
+    const response = await api.get('/orders/admin/all');
+    return response.data;
+  },
+
+  // Lấy đơn hàng theo trạng thái (đã có rồi nhưng giữ lại cho rõ)
+  getOrdersByStatusAdmin: async (status) => {
+    const response = await api.get(`/orders/admin/status/${status}`);
+    return response.data;
+  },
+
+  // Lấy chi tiết đơn hàng
+  getOrderDetail: async (orderId) => {
+    const response = await api.get(`/orders/${orderId}`);
+    return response.data;
+  },
+
+  // Cập nhật trạng thái đơn hàng
+  updateOrderStatus: async (orderId, newStatus) => {
+    const response = await api.put(`/orders/${orderId}/status`, null, {
+      params: { newStatus }
+    });
+    return response.data;
+  },
+
+  // Hủy đơn bởi admin
+  cancelOrderByAdmin: async (orderId) => {
+    const response = await api.put(`/orders/${orderId}/cancel/admin`);
+    return response.data;
+  },
+
+  // Kiểm tra có thể hủy đơn không
+  canCancelOrder: async (orderId) => {
+    const response = await api.get(`/orders/${orderId}/can-cancel`);
+    return response.data;
+  },
+
+  // Lấy danh sách trạng thái đơn hàng (dùng cho select)
+  getOrderStatuses: async () => {
+    const response = await api.get('/orders/statuses');
+    return response.data;
+  },
+
+// =================== BỔ SUNG VÀO userAPI (nếu người dùng cần xem đơn hàng của mình) ===================
+
+  // User xem danh sách đơn hàng của mình
+  getMyOrders: async (userId) => {
+    const response = await api.get(`/orders/user/${userId}`);
+    return response.data;
+  },
+
+  // User xem đơn hàng theo trạng thái
+  getMyOrdersByStatus: async (userId, status) => {
+    const response = await api.get(`/orders/user/${userId}/status/${status}`);
+    return response.data;
+  },
+
+  // User hủy đơn hàng (trong 30 phút)
+  cancelOrderByUser: async (userId, orderId) => {
+    const response = await api.put(`/orders/${orderId}/cancel/user/${userId}`);
+    return response.data;
+  },
+
+  // Preview đơn hàng trước khi đặt
+  previewOrder: async (userId, voucherCode = null) => {
+    const response = await api.get('/orders/preview', {
+      params: { userId, voucherCode }
+    });
+    return response.data;
+  },
+
+  // Tạo đơn hàng
+  createOrder: async (userId, options = {}) => {
+    const { voucherCode, paymentMethod } = options;
+    const params = {};
+    if (voucherCode) {
+      params.voucherCode = voucherCode;
+    }
+    if (paymentMethod) {
+      params.paymentMethod = paymentMethod;
+    }
+    const response = await api.post(`/orders/create/${userId}`, null, {
+      params
+    });
+    return response.data;
+  },
   getAllOrders: async () => {
     const response = await api.get('/orders/admin/all');
     return response.data;
@@ -161,7 +248,7 @@ export const adminAPI = {
 
   // Products
   getAllProducts: async () => {
-    const response = await api.get('/products');
+    const response = await api.get('/products/all');
     return response.data;
   },
   
@@ -180,6 +267,11 @@ export const adminAPI = {
     return response.data;
   },
   
+  deleteProduct: async (id) => {
+    const response = await api.delete(`/products/${id}`);
+    return response.data;
+  },
+
   toggleProduct: async (id) => {
     const response = await api.put(`/products/${id}/toggle`);
     return response.data;
@@ -379,6 +471,16 @@ export const userAPI = {
     const response = await api.get(`/cart/user/${userId}`);
     return response.data;
   },
+  createOrder: async (userId, options = {}) => {
+    const { voucherCode, paymentMethod } = options;
+    const params = {};
+    if (voucherCode) params.voucherCode = voucherCode;
+    if (paymentMethod) params.paymentMethod = paymentMethod;
+    const response = await api.post(`/orders/create/${userId}`, null, {
+      params
+    });
+    return response.data;
+  },
   
   addToCart: async (userId, productId, quantity = 1) => {
     // Gửi params trong URL query string cho POST request
@@ -449,7 +551,74 @@ export const userAPI = {
     const response = await api.delete(`/reviews/response/${responseId}`);
     return response.data;
   },
+
+  // Orders
+  getOrders: async (userId) => {
+    const response = await api.get(`/orders/user/${userId}`);
+    return response.data;
+  },
+
+  getOrdersByStatus: async (userId, status) => {
+    const response = await api.get(`/orders/user/${userId}/status/${status}`);
+    return response.data;
+  },
+
+  getOrderDetail: async (orderId) => {
+    const response = await api.get(`/orders/${orderId}`);
+    return response.data;
+  },
+
+  getOrderStatuses: async () => {
+    const response = await api.get('/orders/statuses');
+    return response.data;
+  },
+
+  canCancelOrder: async (orderId) => {
+    const response = await api.get(`/orders/${orderId}/can-cancel`);
+    return response.data;
+  },
+
+  cancelOrder: async (orderId, userId) => {
+    const response = await api.put(`/orders/${orderId}/cancel/user/${userId}`);
+    return response.data;
+  },
 };
 
 export default api;
+
+export const paymentAPI = {
+  createVnPayPayment: async (orderId) => {
+    const response = await api.post('/payment/vnpay/create', null, {
+      params: { orderId }
+    });
+    return response.data;
+  },
+};
+
+export const notificationAPI = {
+  getAll: async () => {
+    const response = await api.get('/notifications');
+    return response.data;
+  },
+  getUnread: async () => {
+    const response = await api.get('/notifications/unread');
+    return response.data;
+  },
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread/count');
+    return response.data;
+  },
+  markAsRead: async (notificationId) => {
+    const response = await api.post(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+  markAllAsRead: async () => {
+    const response = await api.post('/notifications/read-all');
+    return response.data;
+  },
+  delete: async (notificationId) => {
+    const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+};
 

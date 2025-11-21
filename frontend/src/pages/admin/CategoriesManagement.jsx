@@ -1,196 +1,152 @@
+// src/pages/admin/OrdersManagement.jsx
 import { useState, useEffect } from 'react';
-import { adminAPI } from '../../services/api';
-import styles from './CategoriesManagement.module.css';
+import styles from './CategoriesManagement.module.css'; // Dùng chung style cho đồng bộ
 
-function CategoriesManagement() {
-  const [categories, setCategories] = useState([]);
-  const [filteredCategories, setFilteredCategories] = useState([]);
-  const [categoryStats, setCategoryStats] = useState({});
+const ORDER_STATUS = {
+  WAITING_CONFIRMATION: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  SHIPPED: 'Đang giao',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã hủy'
+};
+
+const STATUS_COLOR = {
+  WAITING_CONFIRMATION: 'bg-yellow-100 text-yellow-800',
+  CONFIRMED: 'bg-blue-100 text-blue-800',
+  SHIPPED: 'bg-purple-100 text-purple-800',
+  COMPLETED: 'bg-green-100 text-green-800',
+  CANCELLED: 'bg-red-100 text-red-800'
+};
+
+export default function OrdersManagement() {
+  const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [orderStats, setOrderStats] = useState({
+    total: 0,
+    waiting: 0,
+    confirmed: 0,
+    shipped: 0,
+    completed: 0,
+    cancelled: 0
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [formData, setFormData] = useState({ name: '' });
-  const [submitting, setSubmitting] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
-    loadCategories();
+    loadOrders();
   }, []);
 
   useEffect(() => {
-    filterCategories();
-  }, [categories, searchTerm]);
+    filterOrders();
+  }, [orders, searchTerm]);
 
-  const loadCategories = async () => {
+  const loadOrders = async () => {
     try {
       setLoading(true);
-      const response = await adminAPI.getAllCategories();
-      const categoriesData = response.data || [];
-      setCategories(categoriesData);
-      
-      // Load stats for each category
-      const statsPromises = categoriesData.map(async (category) => {
-        try {
-          const infoResponse = await adminAPI.getCategoryInfo(category.id);
-          return {
-            id: category.id,
-            totalProducts: infoResponse.data.totalProducts || 0,
-            activeProducts: infoResponse.data.activeProducts || 0
-          };
-        } catch (error) {
-          console.error(`Error loading stats for category ${category.id}:`, error);
-          return {
-            id: category.id,
-            totalProducts: 0,
-            activeProducts: 0
-          };
-        }
+      const token = localStorage.getItem('accessToken');
+
+      // Gọi 5 endpoint trạng thái và gộp lại (vì chưa có /admin/all)
+      const statuses = Object.keys(ORDER_STATUS);
+      const requests = statuses.map(status =>
+        fetch(`/api/orders/admin/status/${status}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.ok ? res.json() : { success: false, data: [] })
+      );
+
+      const responses = await Promise.all(requests);
+      let allOrders = [];
+      const stats = { total: 0, waiting: 0, confirmed: 0, shipped: 0, completed: 0, cancelled: 0 };
+
+      responses.forEach((resp, index) => {
+        const statusKey = statuses[index];
+        const data = resp.success ? resp.data : [];
+        allOrders = allOrders.concat(data);
+
+        stats.total += data.length;
+        if (statusKey === 'WAITING_CONFIRMATION') stats.waiting += data.length;
+        if (statusKey === 'CONFIRMED') stats.confirmed += data.length;
+        if (statusKey === 'SHIPPED') stats.shipped += data.length;
+        if (statusKey === 'COMPLETED') stats.completed += data.length;
+        if (statusKey === 'CANCELLED') stats.cancelled += data.length;
       });
-      
-      const stats = await Promise.all(statsPromises);
-      const statsMap = {};
-      stats.forEach(stat => {
-        statsMap[stat.id] = {
-          totalProducts: stat.totalProducts,
-          activeProducts: stat.activeProducts
-        };
-      });
-      setCategoryStats(statsMap);
+
+      // Sắp xếp mới nhất lên đầu
+      allOrders.sort((a, b) => b.id - a.id);
+
+      setOrders(allOrders);
+      setOrderStats(stats);
     } catch (error) {
-      console.error('Error loading categories:', error);
-      alert('Có lỗi khi tải danh sách danh mục');
+      console.error('Lỗi tải đơn hàng:', error);
+      alert('Có lỗi khi tải danh sách đơn hàng');
     } finally {
       setLoading(false);
     }
   };
 
-  const filterCategories = () => {
-    let filtered = [...categories];
+  const filterOrders = () => {
+    let filtered = [...orders];
 
-    // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(cat =>
-        cat.name?.toLowerCase().includes(term) ||
-        cat.id.toString().includes(term)
+      filtered = filtered.filter(order =>
+        order.id.toString().includes(term) ||
+        order.customer?.username?.toLowerCase().includes(term)
       );
     }
 
-    // Sort by id
-    filtered.sort((a, b) => a.id - b.id);
-
-    setFilteredCategories(filtered);
+    setFilteredOrders(filtered);
   };
 
-  const handleAddCategory = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên danh mục');
-      return;
-    }
+  const updateStatus = async (orderId, newStatus) => {
+    if (!window.confirm(`Chuyển trạng thái đơn hàng #${orderId} sang "${ORDER_STATUS[newStatus]}"?`)) return;
 
     try {
-      setSubmitting(true);
-      const response = await adminAPI.createCategory({ name: formData.name.trim() });
-      console.log('Create category response:', response);
-      
-      // Backend trả về {success, message, data, error}
-      if (response && response.success !== false) {
-        await loadCategories();
-        setIsAddModalOpen(false);
-        setFormData({ name: '' });
-        alert('Thêm danh mục thành công!');
-      } else {
-        const errorMsg = response?.message || response?.error || 'Có lỗi khi thêm danh mục';
-        alert(errorMsg);
-      }
-    } catch (error) {
-      console.error('Error creating category:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      
-      const errorMsg = error.response?.data?.message || 
-                      error.response?.data?.error || 
-                      error.message || 
-                      'Có lỗi khi thêm danh mục';
-      alert(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleEditCategory = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên danh mục');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const response = await adminAPI.updateCategory(selectedCategory.id, { 
-        name: formData.name.trim()
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`/api/orders/${orderId}/status?newStatus=${newStatus}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('Update category response:', response);
-      
-      // Backend trả về {success, message, data, error}
-      if (response && response.success !== false) {
-        await loadCategories();
-        setIsEditModalOpen(false);
-        setSelectedCategory(null);
-        setFormData({ name: '' });
-        alert('Cập nhật danh mục thành công!');
+
+      const data = await res.json();
+      if (data.success) {
+        loadOrders(); // reload lại toàn bộ
+        setSelectedOrder(data.data);
+        alert('Cập nhật trạng thái thành công!');
       } else {
-        const errorMsg = response?.message || response?.error || 'Có lỗi khi cập nhật danh mục';
-        alert(errorMsg);
+        alert(data.message || 'Cập nhật thất bại');
       }
     } catch (error) {
-      console.error('Error updating category:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      
-      const errorMsg = error.response?.data?.message || 
-                      error.response?.data?.error || 
-                      error.message || 
-                      'Có lỗi khi cập nhật danh mục';
-      alert(errorMsg);
-    } finally {
-      setSubmitting(false);
+      alert('Có lỗi xảy ra');
     }
   };
 
-  const handleDeleteCategory = async (category) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${category.name}"?\n\nLưu ý: Hành động này không thể hoàn tác!`)) {
-      return;
-    }
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm(`Bạn có chắc muốn hủy đơn hàng #${orderId}?`)) return;
 
     try {
-      await adminAPI.deleteCategory(category.id);
-      await loadCategories();
-      alert('Xóa danh mục thành công!');
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`/api/orders/${orderId}/cancel/admin`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        loadOrders();
+        setSelectedOrder(data.data);
+        alert('Hủy đơn thành công');
+      }
     } catch (error) {
-      console.error('Error deleting category:', error);
-      alert('Có lỗi khi xóa danh mục. Có thể danh mục này đang được sử dụng.');
+      alert('Hủy đơn thất bại');
     }
-  };
-
-  const openEditModal = (category) => {
-    setSelectedCategory(category);
-    setFormData({ name: category.name });
-    setIsEditModalOpen(true);
-  };
-
-  const openAddModal = () => {
-    setFormData({ name: '' });
-    setIsAddModalOpen(true);
   };
 
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.spinner}></div>
-        <p>Đang tải danh sách danh mục...</p>
+        <p>Đang tải danh sách đơn hàng...</p>
       </div>
     );
   }
@@ -198,40 +154,52 @@ function CategoriesManagement() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Quản lý Danh mục</h1>
-        <button className={styles.addButton} onClick={openAddModal}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Thêm danh mục
-        </button>
+        <h1 className={styles.title}>Quản lý Đơn hàng</h1>
       </div>
 
-      <div className={styles.controls}>
-        <div className={styles.searchBox}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Tìm kiếm danh mục..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
+      {/* Stats Cards */}
+      <div className={styles.controls} style={{ marginBottom: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
         <div className={styles.statItem}>
-          <span className={styles.statLabel}>Tổng số:</span>
-          <span className={styles.statValue}>{categories.length}</span>
+          <span className={styles.statLabel}>Tổng đơn</span>
+          <span className={styles.statValue}>{orderStats.total}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statLabel}>Chờ xác nhận</span>
+          <span className={styles.statValue} style={{ color: '#d97706' }}>{orderStats.waiting}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statLabel}>Đang giao</span>
+          <span className={styles.statValue} style={{ color: '#7c3aed' }}>{orderStats.shipped}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statLabel}>Hoàn thành</span>
+          <span className={styles.statValue} style={{ color: '#16a34a' }}>{orderStats.completed}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statLabel}>Đã hủy</span>
+          <span className={styles.statValue} style={{ color: '#dc2626' }}>{orderStats.cancelled}</span>
         </div>
       </div>
 
-      {filteredCategories.length === 0 ? (
+      {/* Search */}
+      <div className={styles.searchBox} style={{ maxWidth: '400px', marginBottom: '2rem' }}>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Tìm kiếm theo ID hoặc tên khách..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {filteredOrders.length === 0 ? (
         <div className={styles.emptyState}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
           </svg>
-          <p>Không tìm thấy danh mục nào</p>
+          <p>Không tìm thấy đơn hàng nào</p>
         </div>
       ) : (
         <div className={styles.tableContainer}>
@@ -239,150 +207,128 @@ function CategoriesManagement() {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Tên danh mục</th>
-                <th>Tổng sản phẩm</th>
-                <th>Sản phẩm đang bán</th>
+                <th>Khách hàng</th>
+                <th>Tổng tiền</th>
+                <th>Trạng thái</th>
+                <th>Ngày đặt</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {filteredCategories.map((category) => {
-                const stats = categoryStats[category.id] || { totalProducts: 0, activeProducts: 0 };
-                return (
-                  <tr key={category.id}>
-                    <td>{category.id}</td>
-                    <td className={styles.categoryName}>{category.name}</td>
-                    <td>
-                      <span className={styles.productCount}>{stats.totalProducts}</span>
-                    </td>
-                    <td>
-                      <span className={styles.activeProductCount}>{stats.activeProducts}</span>
-                    </td>
-                    <td>
-                      <div className={styles.actions}>
-                        <button
-                          className={styles.actionButton}
-                          onClick={() => openEditModal(category)}
-                          title="Sửa"
-                        >
-                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-
-                        <button
-                          className={`${styles.actionButton} ${styles.deleteButton}`}
-                          onClick={() => handleDeleteCategory(category)}
-                          title="Xóa"
-                        >
-                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredOrders.map((order) => (
+                <tr key={order.id} onClick={() => setSelectedOrder(order)} style={{ cursor: 'pointer' }}>
+                  <td>#{order.id}</td>
+                  <td className={styles.categoryName}>
+                    {order.customer?.username || 'Khách lẻ'}
+                  </td>
+                  <td>{Number(order.totalAmount).toLocaleString('vi-VN')} ₫</td>
+                  <td>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-800'}`}>
+                      {ORDER_STATUS[order.status] || order.status}
+                    </span>
+                  </td>
+                  <td>{new Date(order.createdAt).toLocaleString('vi-VN')}</td>
+                  <td>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}
+                      className={styles.actionButton}
+                      title="Xem chi tiết"
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Add Modal */}
-      {isAddModalOpen && (
-        <div className={styles.modal} onClick={() => setIsAddModalOpen(false)}>
+      {/* Modal chi tiết đơn hàng - giống hệt modal của Categories */}
+      {selectedOrder && (
+        <div className={styles.modal} onClick={() => setSelectedOrder(null)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2>Thêm danh mục mới</h2>
-              <button className={styles.closeButton} onClick={() => setIsAddModalOpen(false)}>
+              <h2>Chi tiết đơn hàng #{selectedOrder.id}</h2>
+              <button className={styles.closeButton} onClick={() => setSelectedOrder(null)}>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleAddCategory}>
-              <div className={styles.formGroup}>
-                <label>Tên danh mục</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ name: e.target.value })}
-                  placeholder="Nhập tên danh mục..."
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.cancelButton}
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={submitting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className={styles.submitButton}
-                  disabled={submitting}
-                >
-                  {submitting ? 'Đang thêm...' : 'Thêm danh mục'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Edit Modal */}
-      {isEditModalOpen && selectedCategory && (
-        <div className={styles.modal} onClick={() => setIsEditModalOpen(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>Sửa danh mục</h2>
-              <button className={styles.closeButton} onClick={() => setIsEditModalOpen(false)}>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div>
+                <p><strong>Khách hàng:</strong> {selectedOrder.customer?.username || 'N/A'}</p>
+                <p><strong>Email:</strong> {selectedOrder.customer?.email || 'N/A'}</p>
+                <p><strong>Địa chỉ:</strong> {selectedOrder.deliveryAddress?.fullAddress || 'Chưa có'}</p>
+              </div>
+              <div>
+                <p><strong>Tổng tiền:</strong> {Number(selectedOrder.totalAmount).toLocaleString('vi-VN')} ₫</p>
+                <p><strong>Trạng thái:</strong> <span className={STATUS_COLOR[selectedOrder.status]}>{ORDER_STATUS[selectedOrder.status]}</span></p>
+                <p><strong>Ngày đặt:</strong> {new Date(selectedOrder.createdAt).toLocaleString('vi-VN')}</p>
+              </div>
+            </div>
+
+            <h3 className="font-bold text-lg mb-4">Sản phẩm trong đơn</h3>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                  <th className="text-left px-4 py-3">Sản phẩm</th>
+                  <th className="text-center px-4 py-3">SL</th>
+                  <th className="text-right px-4 py-3">Giá</th>
+                  <th className="text-right px-4 py-3">Tổng</th>
+                </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.items?.map((item) => (
+                    <tr key={item.id} className="border-t">
+                      <td className="px-4 py-3">{item.product.name}</td>
+                      <td className="px-4 py-3 text-center">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right">{Number(item.price).toLocaleString('vi-VN')} ₫</td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {(item.price * item.quantity).toLocaleString('vi-VN')} ₫
+                      </td>
+                    </tr>
+                  )) || <tr><td colSpan="4" className="text-center py-8 text-gray-500">Không có sản phẩm</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <div className={styles.modalActions} style={{ marginTop: '2rem' }}>
+              {selectedOrder.status !== 'COMPLETED' && selectedOrder.status !== 'CANCELLED' && (
+                <>
+                  {selectedOrder.status === 'WAITING_CONFIRMATION' && (
+                    <button onClick={() => updateStatus(selectedOrder.id, 'CONFIRMED')} className={styles.submitButton}>
+                      Xác nhận đơn
+                    </button>
+                  )}
+                  {selectedOrder.status === 'CONFIRMED' && (
+                    <button onClick={() => updateStatus(selectedOrder.id, 'SHIPPED')} className={styles.submitButton}>
+                      Đang giao
+                    </button>
+                  )}
+                  {selectedOrder.status === 'SHIPPED' && (
+                    <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className={styles.submitButton}>
+                      Hoàn thành
+                    </button>
+                  )}
+                  <button onClick={() => cancelOrder(selectedOrder.id)} className={`${styles.submitButton} ${styles.deleteButton || ''}`} style={{ background: '#dc2626' }}>
+                    Hủy đơn
+                  </button>
+                </>
+              )}
+              <button onClick={() => setSelectedOrder(null)} className={styles.cancelButton}>
+                Đóng
               </button>
             </div>
-            <form onSubmit={handleEditCategory}>
-              <div className={styles.formGroup}>
-                <label>Tên danh mục</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ name: e.target.value })}
-                  placeholder="Nhập tên danh mục..."
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.cancelButton}
-                  onClick={() => setIsEditModalOpen(false)}
-                  disabled={submitting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className={styles.submitButton}
-                  disabled={submitting}
-                >
-                  {submitting ? 'Đang cập nhật...' : 'Cập nhật'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-export default CategoriesManagement;
-

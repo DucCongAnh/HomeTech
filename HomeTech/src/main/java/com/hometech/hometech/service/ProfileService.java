@@ -1,13 +1,13 @@
 package com.hometech.hometech.service;
 
-import com.hometech.hometech.dto.UpdateProfileDTO;
-import com.hometech.hometech.model.Address;
-import com.hometech.hometech.model.Customer;
-import com.hometech.hometech.model.User;
-import com.hometech.hometech.model.Account;
 import com.hometech.hometech.Repository.AddressRepository;
 import com.hometech.hometech.Repository.CustomerRepository;
 import com.hometech.hometech.Repository.UserRepository;
+import com.hometech.hometech.dto.UpdateProfileDTO;
+import com.hometech.hometech.model.Account;
+import com.hometech.hometech.model.Address;
+import com.hometech.hometech.model.Customer;
+import com.hometech.hometech.model.User;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,13 +22,16 @@ public class ProfileService {
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
+    private final NotifyService notifyService;
 
     public ProfileService(CustomerRepository customerRepository,
                           UserRepository userRepository,
-                          AddressRepository addressRepository) {
+                          AddressRepository addressRepository,
+                          NotifyService notifyService) {
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
+        this.notifyService = notifyService;
     }
 
     // ===================================================================
@@ -79,6 +82,14 @@ public class ProfileService {
         customer.getAddresses().add(address);
 
         customerRepository.save(customer);
+        try {
+            notifyService.createNotification(customer.getId(),
+                    "Thông tin cá nhân của bạn đã được cập nhật",
+                    "PROFILE_UPDATE",
+                    customer.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send profile notification: " + e.getMessage());
+        }
         return customer;
     }
 

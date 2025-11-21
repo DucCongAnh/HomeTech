@@ -18,6 +18,15 @@ public class Payment {
     private String method;
     private double amount;
     private String status;
+    private String txnRef;
+    private String orderInfo;
+    private String bankCode;
+    private String cardType;
+    private String responseCode;
+    private String transactionNo;
+    private String payDate;
+    private String transactionStatus;
+    private String secureHash;
 
     @OneToOne
     @JoinColumn(name = "order_id")

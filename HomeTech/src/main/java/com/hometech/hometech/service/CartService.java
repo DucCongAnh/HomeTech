@@ -2,7 +2,6 @@ package com.hometech.hometech.service;
 
 import com.hometech.hometech.Repository.CartItemRepository;
 import com.hometech.hometech.Repository.CustomerRepository;
-import com.hometech.hometech.Repository.UserRepository;
 import com.hometech.hometech.Repository.ProductRepository;
 import com.hometech.hometech.model.Cart;
 import com.hometech.hometech.model.CartItem;
@@ -22,16 +21,16 @@ public class CartService {
     private final CartItemRepository cartRepo;
     private final ProductRepository productRepo;
     private final CustomerRepository customerRepo;
-    private final UserRepository userRepository;
+    private final NotifyService notifyService;
 
     public CartService(CartItemRepository cartRepo,
                        ProductRepository productRepo,
                        CustomerRepository customerRepo,
-                       UserRepository userRepository) {
+                       NotifyService notifyService) {
         this.cartRepo = cartRepo;
         this.productRepo = productRepo;
         this.customerRepo = customerRepo;
-        this.userRepository = userRepository;
+        this.notifyService = notifyService;
     }
 
     // Lấy customer theo userId hoặc ném ngoại lệ
@@ -88,17 +87,28 @@ public class CartService {
                 .filter(item -> item.getProduct() != null && Objects.equals(item.getProduct().getId(), product.getId()))
                 .findFirst();
 
+        CartItem savedItem;
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
             item.setQuantity(item.getQuantity() + quantity);
-            return cartRepo.save(item);
+            savedItem = cartRepo.save(item);
         } else {
             CartItem newItem = new CartItem();
             newItem.setProduct(product);
             newItem.setCart(customer.getCart());
             newItem.setQuantity(quantity);
-            return cartRepo.save(newItem);
+            savedItem = cartRepo.save(newItem);
         }
+
+        try {
+            String productName = product.getName() != null ? product.getName() : "sản phẩm";
+            String message = String.format("Bạn đã thêm %d x \"%s\" vào giỏ hàng", quantity, productName);
+            notifyService.createNotification(customer.getId(), message, "CART_ADD", product.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send cart notification: " + e.getMessage());
+        }
+
+        return savedItem;
     }
 
 

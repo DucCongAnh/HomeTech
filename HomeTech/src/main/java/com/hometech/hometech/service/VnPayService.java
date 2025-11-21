@@ -2,6 +2,8 @@ package com.hometech.hometech.service;
 
 import com.hometech.hometech.config.HmacUtil;
 import com.hometech.hometech.config.VnPayConfig;
+import com.hometech.hometech.dto.VnPayCreateResponse;
+import com.hometech.hometech.dto.VnPayReturnResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,7 +20,7 @@ public class VnPayService {
     @Autowired
     private VnPayConfig config;
 
-    public String createOrder(HttpServletRequest request, long amount, String orderInfo) {
+    public VnPayCreateResponse createPaymentUrl(HttpServletRequest request, long amount, String orderInfo) {
         String vnp_Version     = "2.1.0";
         String vnp_Command     = "pay";
         String vnp_TxnRef      = Long.toString(System.currentTimeMillis());  // hoặc mã đơn hàng
@@ -66,10 +68,10 @@ public class VnPayService {
 
         String secureHash = HmacUtil.hmacSHA512(config.getHashSecret(), hashData.toString());
         String paymentUrl = config.getPaymentUrl() + "?" + query.toString() + "&vnp_SecureHash=" + secureHash;
-        return paymentUrl;
+        return new VnPayCreateResponse(paymentUrl, vnp_TxnRef, Collections.unmodifiableMap(vnp_Params));
     }
 
-    public int processReturn(HttpServletRequest request) {
+    public VnPayReturnResponse processReturn(HttpServletRequest request) {
         Map<String, String> vnp_Params = new HashMap<>();
         for (Enumeration<String> e = request.getParameterNames(); e.hasMoreElements();) {
             String paramName = e.nextElement();
@@ -78,6 +80,7 @@ public class VnPayService {
             }
         }
         String vnp_SecureHash = vnp_Params.remove("vnp_SecureHash");
+        String secureHashValue = vnp_SecureHash;
         // sắp xếp và hash lại như lúc gửi
         List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
         Collections.sort(fieldNames);
@@ -88,23 +91,21 @@ public class VnPayService {
         if (hashData.length() > 0) hashData.deleteCharAt(hashData.length() - 1);
         String calculatedHash = HmacUtil.hmacSHA512(config.getHashSecret(), hashData.toString());
 
-        if (!calculatedHash.equals(vnp_SecureHash)) {
-            return 0; // hash không hợp lệ -> giao dịch nghi ngờ
-        }
-
+        boolean validSignature = calculatedHash.equals(vnp_SecureHash);
         String responseCode = vnp_Params.get("vnp_ResponseCode");
         String txnRef       = vnp_Params.get("vnp_TxnRef");
         String amount       = vnp_Params.get("vnp_Amount");
-        // đổi lại: amount gửi bên trên *100 -> giờ nhận về cũng *100
-        long paidAmount = Long.parseLong(amount) / 100;
+        long paidAmount = amount != null ? Long.parseLong(amount) / 100 : 0L;
 
-        if ("00".equals(responseCode)) {
-            // thành công
-            // cập nhật đơn hàng theo txnRef, paidAmount ...
-            return 1;
-        } else {
-            // thất bại
-            return 2;
-        }
+        Map<String, String> rawParams = new HashMap<>(vnp_Params);
+        rawParams.put("vnp_SecureHash", secureHashValue);
+
+        return new VnPayReturnResponse(
+                validSignature,
+                responseCode,
+                txnRef,
+                paidAmount,
+                Collections.unmodifiableMap(rawParams)
+        );
     }
 }

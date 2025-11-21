@@ -6,7 +6,7 @@ import OrdersManagement from './OrdersManagement';
 import CategoriesManagement from './CategoriesManagement';
 import ReviewsManagement from './ReviewsManagement';
 import UsersManagement from './UsersManagement';
-// import ProductsManagement from './ProductsManagement';
+import ProductsManagement from './ProductsManagement';
 import styles from './AdminDashboard.module.css';
 
 function AdminDashboard() {
@@ -66,8 +66,8 @@ function AdminDashboard() {
         return <ReviewsManagement />;
       case 'users':
         return <UsersManagement />;
-      // case 'products':
-      //   return <ProductsManagement />;
+      case 'products':
+        return <ProductsManagement />;
       default:
         return <Dashboard />;
     }
