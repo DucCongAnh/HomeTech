@@ -10,6 +10,7 @@ function Favorites() {
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
   const [productImages, setProductImages] = useState({});
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadUserInfo();
@@ -47,14 +48,55 @@ function Favorites() {
   const loadFavorites = async () => {
     try {
       setLoading(true);
-      // TODO: Implement favorites API endpoint
-      // For now, show empty state
-      setFavorites([]);
+      setError(null);
+      const response = await userAPI.getFavorites(userInfo.id);
+      if (response.success) {
+        const products = response.data || [];
+        setFavorites(products);
+        await loadProductImages(products);
+      } else {
+        setFavorites([]);
+      }
     } catch (error) {
       console.error('Error loading favorites:', error);
+      setError('Không thể tải danh sách yêu thích, vui lòng thử lại sau.');
+      setFavorites([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadProductImages = async (products) => {
+    if (!products.length) {
+      setProductImages({});
+      return;
+    }
+
+    const entries = await Promise.all(
+      products.map(async (product) => {
+        try {
+          const imageRes = await userAPI.getProductImages(product.id);
+          if (imageRes.success && Array.isArray(imageRes.data) && imageRes.data.length > 0) {
+            const firstImage = imageRes.data[0];
+            if (firstImage.imageData) {
+              return [product.id, `data:image/jpeg;base64,${firstImage.imageData}`];
+            }
+          }
+        } catch (err) {
+          console.error(`Error loading images for product ${product.id}:`, err);
+        }
+        return [product.id, null];
+      })
+    );
+
+    const imageMap = entries.reduce((acc, [productId, imageUrl]) => {
+      if (imageUrl) {
+        acc[productId] = imageUrl;
+      }
+      return acc;
+    }, {});
+
+    setProductImages(imageMap);
   };
 
   const formatPrice = (price) => {
@@ -84,6 +126,7 @@ function Favorites() {
 
       <div className={styles.content}>
         <h1 className={styles.title}>Danh sách yêu thích</h1>
+        {error && <div className={styles.errorMessage}>{error}</div>}
 
         {favorites.length === 0 ? (
           <div className={styles.emptyState}>

@@ -14,6 +14,7 @@ import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
 import Orders from './pages/Orders';
 import Favorites from './pages/Favorites';
+import ExpenseManagement from './pages/ExpenseManagement';
 import NotificationBell from './components/NotificationBell';
 import VnPayResult from './pages/VnPayResult';
 import './App.css';
@@ -27,19 +28,19 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        
+
         {/* Admin login - separate URL */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/AdminLogin" element={<AdminLogin />} />
         <Route path="/admin/register" element={<AdminRegister />} />
         <Route path="/AdminRegister" element={<AdminRegister />} />
-        
+
         {/* Admin Dashboard */}
         <Route path="/admin" element={<AdminDashboard />} />
-        
+
         {/* OAuth2 callback */}
         <Route path="/oauth2/callback" element={<OAuthCallback />} />
-        
+
         {/* Public product routes */}
         <Route path="/" element={<Home />} />
         <Route path="/product/:id" element={<ProductDetail />} />
@@ -47,9 +48,10 @@ function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/expenses" element={<ExpenseManagement />} />
         <Route path="/payment/vnpay/result" element={<VnPayResult />} />
         <Route path="/favorites" element={<Favorites />} />
-        
+
         {/* Default redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

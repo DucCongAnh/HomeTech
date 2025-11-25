@@ -185,4 +185,18 @@ public class OrderRestController {
             return buildResponse(false, "Hủy đơn hàng thất bại", null, e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    @GetMapping("/my-expenses")
+    public ResponseEntity<Map<String, Object>> getMyExpenses(
+            @RequestParam Long userId,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false, defaultValue = "DAY") String groupBy) {
+        try {
+            Map<String, Object> expenses = orderService.getExpensesByDateRange(userId, startDate, endDate, groupBy);
+            return buildResponse(true, "Lấy thống kê chi tiêu thành công", expenses, null, HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return buildResponse(false, "Không thể lấy thống kê chi tiêu", null, e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 }

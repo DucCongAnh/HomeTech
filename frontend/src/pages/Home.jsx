@@ -61,7 +61,7 @@ function Home() {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Load user info, products, categories, top selling in parallel
       const token = localStorage.getItem('accessToken');
       const [userRes, productsRes, categoriesRes, topSellingRes] = await Promise.all([
@@ -82,7 +82,7 @@ function Home() {
       const activeProducts = allProductsData.filter(p => !p.hidden);
       setAllProducts(activeProducts); // Store all products for search
       setProducts(activeProducts);
-      
+
       setCategories(categoriesRes.data || []);
       setTopSelling(topSellingRes.data || []);
 
@@ -92,17 +92,17 @@ function Home() {
           const imagesRes = await userAPI.getProductImages(product.id);
           // imagesRes là {success: true, data: [...], message: "..."}
           const images = imagesRes.data || [];
-          
+
           console.log(`[DEBUG] Product ${product.id}:`, {
             fullResponse: imagesRes,
             imagesArray: images,
             imagesLength: images.length
           });
-          
+
           if (images.length > 0) {
             // Lấy ảnh đầu tiên
             const firstImage = images[0];
-            
+
             console.log(`[DEBUG] Product ${product.id} - First image object:`, {
               id: firstImage.id,
               fileName: firstImage.fileName,
@@ -111,12 +111,12 @@ function Home() {
               imageDataLength: firstImage.imageData?.length,
               imageDataPreview: firstImage.imageData?.substring(0, 100)
             });
-            
+
             let imageUrl = null;
-            
+
             if (firstImage && firstImage.imageData) {
               const imageData = firstImage.imageData;
-              
+
               if (typeof imageData === 'string' && imageData.trim().length > 0) {
                 // Thêm prefix data URL nếu chưa có
                 if (imageData.startsWith('data:')) {
@@ -131,7 +131,7 @@ function Home() {
             } else {
               console.warn(`[WARN] Product ${product.id} - No imageData in firstImage`);
             }
-            
+
             return {
               productId: product.id,
               imageUrl: imageUrl
@@ -192,7 +192,7 @@ function Home() {
     } catch (error) {
       console.error('Search error:', error);
       // Fallback to client-side search
-      const filtered = allProducts.filter(p => 
+      const filtered = allProducts.filter(p =>
         p.name?.toLowerCase().includes(keyword.toLowerCase()) ||
         p.description?.toLowerCase().includes(keyword.toLowerCase())
       );
@@ -232,7 +232,7 @@ function Home() {
 
   const handleSort = async (option) => {
     setSortOption(option);
-    
+
     if (option === 'default') {
       setProducts(allProducts);
       return;
@@ -260,11 +260,11 @@ function Home() {
         default:
           sortedData = allProducts;
       }
-      
+
       // Filter only active products
       const activeSorted = sortedData.filter(p => !p.hidden);
       setProducts(activeSorted);
-      
+
       // If category is selected, filter by category after sorting
       if (selectedCategoryId) {
         // The filteredProducts will handle category filtering
@@ -272,7 +272,7 @@ function Home() {
     } catch (error) {
       console.error('Error sorting products:', error);
       // Fallback to client-side sort
-      const currentProducts = selectedCategoryId 
+      const currentProducts = selectedCategoryId
         ? products.filter(p => p.category?.id === selectedCategoryId)
         : products;
       const sorted = [...currentProducts].sort((a, b) => {
@@ -363,15 +363,15 @@ function Home() {
                 <span className={styles.newSearchLoader}>⏳</span>
               )}
               {searchKeyword && !isSearching && (
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={styles.newSearchClear}
                   onClick={handleClearSearch}
                 >
                   ✕
                 </button>
               )}
-              <button 
+              <button
                 type="button"
                 className={styles.newSearchBtn}
                 onClick={handleSearch}
@@ -379,11 +379,11 @@ function Home() {
                 🔍
               </button>
             </div>
-            
+
             {!searchKeyword.trim() && (
               <div className={styles.headerSortContainer}>
                 <label className={styles.headerSortLabel}>Sắp xếp:</label>
-                <select 
+                <select
                   className={styles.headerSortSelect}
                   value={sortOption}
                   onChange={(e) => handleSort(e.target.value)}
@@ -400,7 +400,7 @@ function Home() {
 
           {/* Category Dropdown Button */}
           <div className={styles.categoryDropdownContainer}>
-            <button 
+            <button
               className={styles.categoryDropdownButton}
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
               onBlur={() => setTimeout(() => setShowCategoryDropdown(false), 200)}
@@ -409,16 +409,16 @@ function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
               <span>Danh mục</span>
-              <svg 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
                 className={`${styles.dropdownArrow} ${showCategoryDropdown ? styles.dropdownArrowOpen : ''}`}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            
+
             {showCategoryDropdown && categories.length > 0 && (
               <div className={styles.categoryDropdownMenu}>
                 <button
@@ -459,10 +459,10 @@ function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <span className={styles.username}>{userInfo.username}</span>
-                  <svg 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24" 
+                  <svg
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                     className={`${styles.dropdownArrow} ${showUserDropdown ? styles.rotated : ''}`}
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -470,8 +470,8 @@ function Home() {
                 </button>
                 {showUserDropdown && (
                   <div className={styles.userDropdown}>
-                    <Link 
-                      to="/profile" 
+                    <Link
+                      to="/profile"
                       className={styles.dropdownItem}
                       onClick={() => setShowUserDropdown(false)}
                     >
@@ -480,8 +480,8 @@ function Home() {
                       </svg>
                       <span>Thông tin cá nhân</span>
                     </Link>
-                    <Link 
-                      to="/orders" 
+                    <Link
+                      to="/orders"
                       className={styles.dropdownItem}
                       onClick={() => setShowUserDropdown(false)}
                     >
@@ -490,8 +490,18 @@ function Home() {
                       </svg>
                       <span>Đơn hàng của tôi</span>
                     </Link>
-                    <Link 
-                      to="/favorites" 
+                    <Link
+                      to="/expenses"
+                      className={styles.dropdownItem}
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span>Xem chi tiêu</span>
+                    </Link>
+                    <Link
+                      to="/favorites"
                       className={styles.dropdownItem}
                       onClick={() => setShowUserDropdown(false)}
                     >
@@ -628,9 +638,9 @@ function Home() {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>
-            {searchKeyword.trim() 
+            {searchKeyword.trim()
               ? `Kết quả tìm kiếm: "${searchKeyword}"`
-              : selectedCategoryId 
+              : selectedCategoryId
                 ? `${categories.find(c => c.id === selectedCategoryId)?.name || 'Danh mục'}`
                 : sortOption !== 'default'
                   ? `Tất cả sản phẩm`

@@ -422,4 +422,36 @@ public class OrderService {
         }
         return "khách hàng";
     }
+
+    public Map<String, Object> getExpensesByDateRange(Long userId, String startDateStr, String endDateStr, String groupBy) {
+        Customer customer = customerRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        // Parse dates
+        LocalDateTime startDate = LocalDateTime.parse(startDateStr + "T00:00:00");
+        LocalDateTime endDate = LocalDateTime.parse(endDateStr + "T23:59:59");
+
+        // Get all orders for this user
+        List<Order> allOrders = orderRepo.findByCustomer(customer);
+
+        // Filter orders by date range and exclude cancelled orders
+        List<Order> filteredOrders = allOrders.stream()
+                .filter(order -> order.getCreatedAt() != null)
+                .filter(order -> !order.getCreatedAt().isBefore(startDate) && !order.getCreatedAt().isAfter(endDate))
+                .filter(order -> order.getStatus() != OrderStatus.CANCELLED)
+                .toList();
+
+        // Calculate total expense
+        double totalExpense = filteredOrders.stream()
+                .mapToDouble(Order::getTotalAmount)
+                .sum();
+
+        // Prepare response
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("orders", filteredOrders);
+        result.put("totalExpense", totalExpense);
+        result.put("orderCount", filteredOrders.size());
+
+        return result;
+    }
 }

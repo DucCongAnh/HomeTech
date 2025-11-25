@@ -22,7 +22,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .header {
@@ -74,6 +76,16 @@
   font-weight: 700;
   color: #333;
   margin-bottom: 2rem;
+}
+
+.errorMessage {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: #ffe4e6;
+  color: #b91c1c;
+  font-weight: 600;
+  border: 1px solid #fecdd3;
 }
 
 .emptyState {
@@ -194,4 +206,3 @@
     gap: 1rem;
   }
 }
-
