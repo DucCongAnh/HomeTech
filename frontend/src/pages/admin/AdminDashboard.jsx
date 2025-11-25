@@ -6,7 +6,9 @@ import OrdersManagement from './OrdersManagement';
 import CategoriesManagement from './CategoriesManagement';
 import ReviewsManagement from './ReviewsManagement';
 import UsersManagement from './UsersManagement';
-// import ProductsManagement from './ProductsManagement';
+import ProductsManagement from './ProductsManagement';
+import VouchersManagement from './VouchersManagement';
+import RevenueStatistics from './RevenueStatistics';
 import styles from './AdminDashboard.module.css';
 
 function AdminDashboard() {
@@ -19,12 +21,12 @@ function AdminDashboard() {
     const checkAuth = () => {
       const role = localStorage.getItem('role');
       const token = localStorage.getItem('accessToken');
-      
+
       if (!token || role !== 'ADMIN') {
         navigate('/AdminLogin');
         return;
       }
-      
+
       setAdminInfo({
         username: localStorage.getItem('username'),
         email: localStorage.getItem('email'),
@@ -66,8 +68,12 @@ function AdminDashboard() {
         return <ReviewsManagement />;
       case 'users':
         return <UsersManagement />;
-      // case 'products':
-      //   return <ProductsManagement />;
+      case 'products':
+        return <ProductsManagement />;
+      case 'vouchers':
+        return <VouchersManagement />;
+      case 'revenue':
+        return <RevenueStatistics />;
       default:
         return <Dashboard />;
     }
@@ -114,6 +120,16 @@ function AdminDashboard() {
           </button>
 
           <button
+            className={`${styles.navItem} ${activeTab === 'vouchers' ? styles.active : ''}`}
+            onClick={() => setActiveTab('vouchers')}
+          >
+            <svg className={styles.navIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Voucher</span>
+          </button>
+
+          <button
             className={`${styles.navItem} ${activeTab === 'users' ? styles.active : ''}`}
             onClick={() => setActiveTab('users')}
           >
@@ -131,6 +147,16 @@ function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
             <span>Danh mục</span>
+          </button>
+
+          <button
+            className={`${styles.navItem} ${activeTab === 'revenue' ? styles.active : ''}`}
+            onClick={() => setActiveTab('revenue')}
+          >
+            <svg className={styles.navIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span>Doanh thu</span>
           </button>
 
           <button

@@ -1,0 +1,86 @@
+package com.hometech.hometech.controller.Api;
+
+import com.hometech.hometech.dto.SendChatMessageRequest;
+import com.hometech.hometech.model.ChatMessage;
+import com.hometech.hometech.service.ChatIdentityService;
+import com.hometech.hometech.service.ChatMessageService;
+import com.hometech.hometech.service.ConversationService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/chat")
+public class ChatMessageCommandController {
+    
+    private final ChatIdentityService chatIdentityService;
+    private final ChatMessageService chatMessageService;
+    private final ConversationService conversationService;
+    private final SimpMessagingTemplate messagingTemplate;
+    
+    public ChatMessageCommandController(ChatIdentityService chatIdentityService,
+                                        ChatMessageService chatMessageService,
+                                        ConversationService conversationService,
+                                        SimpMessagingTemplate messagingTemplate) {
+        this.chatIdentityService = chatIdentityService;
+        this.chatMessageService = chatMessageService;
+        this.conversationService = conversationService;
+        this.messagingTemplate = messagingTemplate;
+    }
+    
+    @PostMapping("/messages")
+    public ResponseEntity<Map<String, Object>> sendMessage(
+            @RequestBody SendChatMessageRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            ChatIdentityService.ChatIdentity identity = chatIdentityService.resolve(userDetails);
+            
+            if (request.getContent() == null || request.getContent().trim().isEmpty()) {
+                throw new RuntimeException("Nội dung tin nhắn không được để trống");
+            }
+            
+            Long conversationId = request.getConversationId();
+            if (identity.isCustomer()) {
+                if (conversationId == null) {
+                    conversationId = conversationService.getOrCreateConversation(identity.getCustomer()).getId();
+                } else {
+                    conversationService.getConversationForCustomer(conversationId, identity.getCustomer().getId());
+                }
+            } else if (conversationId == null) {
+                throw new RuntimeException("Admin phải chọn cuộc trò chuyện");
+            }
+            
+            ChatMessage message = chatMessageService.sendMessage(
+                    conversationId,
+                    identity.getSenderType(),
+                    identity.getSenderId(),
+                    request.getContent().trim());
+            
+            messagingTemplate.convertAndSend("/topic/messages/" + conversationId, message);
+            
+            response.put("success", true);
+            response.put("message", "Message sent");
+            response.put("data", message);
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", "Failed to send message");
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+}
+

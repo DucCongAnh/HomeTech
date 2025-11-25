@@ -39,7 +39,7 @@ public class Notify {
     private String type; // ORDER, SYSTEM, PROMOTION, etc.
 
     @Column
-    private long relatedId; // Order ID, Product ID, etc.
+    private Long relatedId; // Order ID, Product ID, etc.
 
     public Long getId() {
         return id;
@@ -89,11 +89,11 @@ public class Notify {
         this.type = type;
     }
 
-    public long getRelatedId() {
+    public Long getRelatedId() {
         return relatedId;
     }
 
-    public void setRelatedId(long relatedId) {
+    public void setRelatedId(Long relatedId) {
         this.relatedId = relatedId;
     }
 

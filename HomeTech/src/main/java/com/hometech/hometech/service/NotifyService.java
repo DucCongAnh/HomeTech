@@ -1,7 +1,9 @@
 package com.hometech.hometech.service;
 
+import com.hometech.hometech.Repository.AdminRepository;
 import com.hometech.hometech.Repository.NotifyRepository;
 import com.hometech.hometech.Repository.UserRepository;
+import com.hometech.hometech.model.Admin;
 import com.hometech.hometech.model.Notify;
 import com.hometech.hometech.model.User;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -19,13 +21,16 @@ public class NotifyService {
     private final NotifyRepository notifyRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AdminRepository adminRepository;
 
     public NotifyService(NotifyRepository notifyRepository,
                         UserRepository userRepository,
-                        SimpMessagingTemplate messagingTemplate) {
+                        SimpMessagingTemplate messagingTemplate,
+                        AdminRepository adminRepository) {
         this.notifyRepository = notifyRepository;
         this.userRepository = userRepository;
         this.messagingTemplate = messagingTemplate;
+        this.adminRepository = adminRepository;
     }
 
     /**
@@ -51,6 +56,26 @@ public class NotifyService {
         sendRealtimeNotification(userId, saved);
 
         return saved;
+    }
+
+    /**
+     * Broadcast a notification to all admins
+     */
+    public void notifyAdmins(String message, String type, Long relatedId) {
+        try {
+            List<Admin> admins = adminRepository.findAll();
+            if (admins.isEmpty()) return;
+
+            admins.forEach(admin -> {
+                try {
+                    createNotification(admin.getId(), message, type, relatedId);
+                } catch (Exception ex) {
+                    System.err.println("❌ Failed to notify admin #" + admin.getId() + ": " + ex.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("❌ Failed to broadcast admin notification: " + e.getMessage());
+        }
     }
 
     /**

@@ -203,6 +203,18 @@ const Cart = () => {
 
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  const handleCheckout = () => {
+    if (!userInfo) {
+      navigate('/login');
+      return;
+    }
+    if (cartItems.length === 0) {
+      alert('Giỏ hàng của bạn đang trống.');
+      return;
+    }
+    navigate('/checkout');
+  };
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -347,7 +359,11 @@ const Cart = () => {
                   <span>{formatPrice(calculateTotal())}</span>
                 </div>
               </div>
-              <button className={styles.checkoutButton}>
+              <button
+                className={styles.checkoutButton}
+                onClick={handleCheckout}
+                disabled={cartItems.length === 0}
+              >
                 Thanh toán
               </button>
             </div>

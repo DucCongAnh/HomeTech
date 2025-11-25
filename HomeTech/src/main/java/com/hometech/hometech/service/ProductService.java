@@ -48,12 +48,18 @@ public class ProductService {
     }
 
     // 🔄 Toggle ẩn/hiện
-    public boolean toggleHidden(long productId) {
+    public Product toggleHidden(long productId) {
         Product product = productRepository.findById(productId).orElse(null);
-        if (product == null) return false;
+        if (product == null) return null;
 
         product.setHidden(!product.isHidden());
-        productRepository.save(product);
+        return productRepository.save(product);
+    }
+
+    public boolean deleteById(long productId) {
+        Product product = productRepository.findById(productId).orElse(null);
+        if (product == null) return false;
+        productRepository.delete(product);
         return true;
     }
     // 🟢 Lấy sản phẩm theo danh mục (Category object)

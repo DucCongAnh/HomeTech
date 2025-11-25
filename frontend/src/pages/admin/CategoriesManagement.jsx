@@ -1,190 +1,146 @@
 import { useState, useEffect } from 'react';
-import { adminAPI } from '../../services/api';
 import styles from './CategoriesManagement.module.css';
 
-function CategoriesManagement() {
+export default function CategoriesManagement() {
   const [categories, setCategories] = useState([]);
-  const [filteredCategories, setFilteredCategories] = useState([]);
-  const [categoryStats, setCategoryStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [formData, setFormData] = useState({ name: '', hidden: false });
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [formData, setFormData] = useState({ name: '' });
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    loadCategories();
+    fetchCategories();
   }, []);
 
-  useEffect(() => {
-    filterCategories();
-  }, [categories, searchTerm]);
-
-  const loadCategories = async () => {
+  const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await adminAPI.getAllCategories();
-      const categoriesData = response.data || [];
-      setCategories(categoriesData);
-      
-      // Load stats for each category
-      const statsPromises = categoriesData.map(async (category) => {
-        try {
-          const infoResponse = await adminAPI.getCategoryInfo(category.id);
-          return {
-            id: category.id,
-            totalProducts: infoResponse.data.totalProducts || 0,
-            activeProducts: infoResponse.data.activeProducts || 0
-          };
-        } catch (error) {
-          console.error(`Error loading stats for category ${category.id}:`, error);
-          return {
-            id: category.id,
-            totalProducts: 0,
-            activeProducts: 0
-          };
-        }
-      });
-      
-      const stats = await Promise.all(statsPromises);
-      const statsMap = {};
-      stats.forEach(stat => {
-        statsMap[stat.id] = {
-          totalProducts: stat.totalProducts,
-          activeProducts: stat.activeProducts
-        };
-      });
-      setCategoryStats(statsMap);
+      const token = localStorage.getItem('accessToken');
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/categories', { headers });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setCategories(data.data);
+      } else {
+        console.error('Server returned error:', data.message);
+        alert('Không thể tải danh sách danh mục: ' + data.message);
+      }
     } catch (error) {
-      console.error('Error loading categories:', error);
-      alert('Có lỗi khi tải danh sách danh mục');
+      console.error('Error fetching categories:', error);
+      alert('Có lỗi xảy ra khi tải danh sách: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterCategories = () => {
-    let filtered = [...categories];
-
-    // Filter by search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(cat =>
-        cat.name?.toLowerCase().includes(term) ||
-        cat.id.toString().includes(term)
-      );
-    }
-
-    // Sort by id
-    filtered.sort((a, b) => a.id - b.id);
-
-    setFilteredCategories(filtered);
-  };
-
-  const handleAddCategory = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên danh mục');
+      alert('Tên danh mục không được để trống');
       return;
     }
 
     try {
-      setSubmitting(true);
-      const response = await adminAPI.createCategory({ name: formData.name.trim() });
-      console.log('Create category response:', response);
-      
-      // Backend trả về {success, message, data, error}
-      if (response && response.success !== false) {
-        await loadCategories();
-        setIsAddModalOpen(false);
-        setFormData({ name: '' });
-        alert('Thêm danh mục thành công!');
+      const token = localStorage.getItem('accessToken');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      let response;
+      if (editingCategory) {
+        // Update
+        response = await fetch(`/api/categories/${editingCategory.id}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(formData)
+        });
       } else {
-        const errorMsg = response?.message || response?.error || 'Có lỗi khi thêm danh mục';
-        alert(errorMsg);
+        // Create
+        response = await fetch('/api/categories', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(formData)
+        });
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(editingCategory ? 'Cập nhật thành công' : 'Tạo mới thành công');
+        setShowModal(false);
+        fetchCategories();
+        resetForm();
+      } else {
+        alert(data.message || 'Có lỗi xảy ra');
       }
     } catch (error) {
-      console.error('Error creating category:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      
-      const errorMsg = error.response?.data?.message || 
-                      error.response?.data?.error || 
-                      error.message || 
-                      'Có lỗi khi thêm danh mục';
-      alert(errorMsg);
-    } finally {
-      setSubmitting(false);
+      console.error('Error saving category:', error);
+      alert('Có lỗi xảy ra khi lưu danh mục');
     }
   };
 
-  const handleEditCategory = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Vui lòng nhập tên danh mục');
-      return;
-    }
+  const handleDelete = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa danh mục này?')) return;
 
     try {
-      setSubmitting(true);
-      const response = await adminAPI.updateCategory(selectedCategory.id, { 
-        name: formData.name.trim()
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`/api/categories/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      console.log('Update category response:', response);
-      
-      // Backend trả về {success, message, data, error}
-      if (response && response.success !== false) {
-        await loadCategories();
-        setIsEditModalOpen(false);
-        setSelectedCategory(null);
-        setFormData({ name: '' });
-        alert('Cập nhật danh mục thành công!');
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Xóa thành công');
+        fetchCategories();
       } else {
-        const errorMsg = response?.message || response?.error || 'Có lỗi khi cập nhật danh mục';
-        alert(errorMsg);
+        alert(data.message || 'Không thể xóa danh mục');
       }
-    } catch (error) {
-      console.error('Error updating category:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      
-      const errorMsg = error.response?.data?.message || 
-                      error.response?.data?.error || 
-                      error.message || 
-                      'Có lỗi khi cập nhật danh mục';
-      alert(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteCategory = async (category) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${category.name}"?\n\nLưu ý: Hành động này không thể hoàn tác!`)) {
-      return;
-    }
-
-    try {
-      await adminAPI.deleteCategory(category.id);
-      await loadCategories();
-      alert('Xóa danh mục thành công!');
     } catch (error) {
       console.error('Error deleting category:', error);
-      alert('Có lỗi khi xóa danh mục. Có thể danh mục này đang được sử dụng.');
+      alert('Có lỗi xảy ra khi xóa');
     }
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', hidden: false });
+    setEditingCategory(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setShowModal(true);
   };
 
   const openEditModal = (category) => {
-    setSelectedCategory(category);
-    setFormData({ name: category.name });
-    setIsEditModalOpen(true);
+    setEditingCategory(category);
+    setFormData({
+      name: category.name,
+      hidden: category.hidden
+    });
+    setShowModal(true);
   };
 
-  const openAddModal = () => {
-    setFormData({ name: '' });
-    setIsAddModalOpen(true);
-  };
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -199,7 +155,7 @@ function CategoriesManagement() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>Quản lý Danh mục</h1>
-        <button className={styles.addButton} onClick={openAddModal}>
+        <button className={styles.addButton} onClick={openCreateModal}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -210,7 +166,7 @@ function CategoriesManagement() {
       <div className={styles.controls}>
         <div className={styles.searchBox}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
@@ -219,19 +175,14 @@ function CategoriesManagement() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-
-        <div className={styles.statItem}>
-          <span className={styles.statLabel}>Tổng số:</span>
-          <span className={styles.statValue}>{categories.length}</span>
-        </div>
       </div>
 
       {filteredCategories.length === 0 ? (
         <div className={styles.emptyState}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-          <p>Không tìm thấy danh mục nào</p>
+          <p>Chưa có danh mục nào</p>
         </div>
       ) : (
         <div className={styles.tableContainer}>
@@ -240,140 +191,101 @@ function CategoriesManagement() {
               <tr>
                 <th>ID</th>
                 <th>Tên danh mục</th>
-                <th>Tổng sản phẩm</th>
-                <th>Sản phẩm đang bán</th>
+                <th>Trạng thái</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {filteredCategories.map((category) => {
-                const stats = categoryStats[category.id] || { totalProducts: 0, activeProducts: 0 };
-                return (
-                  <tr key={category.id}>
-                    <td>{category.id}</td>
-                    <td className={styles.categoryName}>{category.name}</td>
-                    <td>
-                      <span className={styles.productCount}>{stats.totalProducts}</span>
-                    </td>
-                    <td>
-                      <span className={styles.activeProductCount}>{stats.activeProducts}</span>
-                    </td>
-                    <td>
-                      <div className={styles.actions}>
-                        <button
-                          className={styles.actionButton}
-                          onClick={() => openEditModal(category)}
-                          title="Sửa"
-                        >
-                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-
-                        <button
-                          className={`${styles.actionButton} ${styles.deleteButton}`}
-                          onClick={() => handleDeleteCategory(category)}
-                          title="Xóa"
-                        >
-                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredCategories.map((category) => (
+                <tr key={category.id}>
+                  <td>#{category.id}</td>
+                  <td className={styles.categoryName}>{category.name}</td>
+                  <td>
+                    <span className={category.hidden ?
+                      'bg-red-100 text-red-800 px-2 py-1 rounded text-xs' :
+                      'bg-green-100 text-green-800 px-2 py-1 rounded text-xs'
+                    }>
+                      {category.hidden ? 'Đang ẩn' : 'Hiển thị'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className={styles.actions}>
+                      <button
+                        className={styles.actionButton}
+                        onClick={() => openEditModal(category)}
+                        title="Chỉnh sửa"
+                      >
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        onClick={() => handleDelete(category.id)}
+                        title="Xóa"
+                      >
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Add Modal */}
-      {isAddModalOpen && (
-        <div className={styles.modal} onClick={() => setIsAddModalOpen(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      {showModal && (
+        <div className={styles.modal} onClick={() => setShowModal(false)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2>Thêm danh mục mới</h2>
-              <button className={styles.closeButton} onClick={() => setIsAddModalOpen(false)}>
+              <h2>{editingCategory ? 'Cập nhật danh mục' : 'Thêm danh mục mới'}</h2>
+              <button className={styles.closeButton} onClick={() => setShowModal(false)}>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleAddCategory}>
-              <div className={styles.formGroup}>
-                <label>Tên danh mục</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ name: e.target.value })}
-                  placeholder="Nhập tên danh mục..."
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.cancelButton}
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={submitting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className={styles.submitButton}
-                  disabled={submitting}
-                >
-                  {submitting ? 'Đang thêm...' : 'Thêm danh mục'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Edit Modal */}
-      {isEditModalOpen && selectedCategory && (
-        <div className={styles.modal} onClick={() => setIsEditModalOpen(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>Sửa danh mục</h2>
-              <button className={styles.closeButton} onClick={() => setIsEditModalOpen(false)}>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form onSubmit={handleEditCategory}>
+            <form onSubmit={handleSubmit}>
               <div className={styles.formGroup}>
                 <label>Tên danh mục</label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ name: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Nhập tên danh mục..."
-                  required
                   autoFocus
                 />
               </div>
+
+              <div className={styles.formGroup}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!formData.hidden}
+                    onChange={(e) => setFormData({ ...formData, hidden: !e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span>Hiển thị danh mục này</span>
+                </label>
+              </div>
+
               <div className={styles.modalActions}>
                 <button
                   type="button"
+                  onClick={() => setShowModal(false)}
                   className={styles.cancelButton}
-                  onClick={() => setIsEditModalOpen(false)}
-                  disabled={submitting}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   className={styles.submitButton}
-                  disabled={submitting}
                 >
-                  {submitting ? 'Đang cập nhật...' : 'Cập nhật'}
+                  {editingCategory ? 'Cập nhật' : 'Thêm mới'}
                 </button>
               </div>
             </form>
@@ -383,6 +295,3 @@ function CategoriesManagement() {
     </div>
   );
 }
-
-export default CategoriesManagement;
-

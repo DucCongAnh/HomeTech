@@ -5,6 +5,7 @@ import com.hometech.hometech.model.Category;
 import com.hometech.hometech.model.Product;
 import com.hometech.hometech.model.ProductImage;
 import com.hometech.hometech.service.CategoryService;
+import com.hometech.hometech.service.NotifyService;
 import com.hometech.hometech.service.ProductImageService;
 import com.hometech.hometech.service.ProductService;
 import org.springframework.http.HttpStatus;
@@ -21,11 +22,16 @@ public class ProductRestController {
     private final ProductService productService;
     private final CategoryService categoryService;
     private final ProductImageService productImageService;
+    private final NotifyService notifyService;
 
-    public ProductRestController(ProductService productService, CategoryService categoryService, ProductImageService productImageService) {
+    public ProductRestController(ProductService productService,
+                                 CategoryService categoryService,
+                                 ProductImageService productImageService,
+                                 NotifyService notifyService) {
         this.productService = productService;
         this.categoryService = categoryService;
         this.productImageService = productImageService;
+        this.notifyService = notifyService;
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(
@@ -43,11 +49,18 @@ public class ProductRestController {
         return ResponseEntity.status(status).body(res);
     }
 
-    // 🟢 Lấy tất cả sản phẩm (chỉ active - hidden = false)
+    // 🟢 Lấy tất cả sản phẩm (active) cho người dùng
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllProducts() {
         List<Product> products = productService.getAllActive();
-        return buildResponse(true, "Lấy danh sách sản phẩm thành công", products, null, HttpStatus.OK);
+        return buildResponse(true, "Lấy danh sách sản phẩm đang hiển thị", products, null, HttpStatus.OK);
+    }
+
+    // 🟣 Lấy tất cả sản phẩm (bao gồm hidden) cho quản trị
+    @GetMapping("/all")
+    public ResponseEntity<Map<String, Object>> getAllProductsForAdmin() {
+        List<Product> products = productService.getAll();
+        return buildResponse(true, "Lấy tất cả sản phẩm thành công", products, null, HttpStatus.OK);
     }
 
     // 🟢 Lấy sản phẩm theo ID
@@ -63,11 +76,22 @@ public class ProductRestController {
     }
     @PutMapping("/{id}/toggle")
     public ResponseEntity<Map<String, Object>> toggleProduct(@PathVariable long id) {
-        boolean ok = productService.toggleHidden(id);
-        if (!ok)
+        Product toggled = productService.toggleHidden(id);
+        if (toggled == null)
             return buildResponse(false, "Không tìm thấy sản phẩm", null, "Product not found", HttpStatus.NOT_FOUND);
 
-        return buildResponse(true, "Thay đổi trạng thái thành công", null, null, HttpStatus.OK);
+        boolean hidden = toggled.isHidden();
+        try {
+            String statusText = hidden ? "đã được ẩn" : "đã được hiển thị";
+            notifyService.notifyAdmins(
+                    String.format("Sản phẩm \"%s\" %s", toggled.getName(), statusText),
+                    "PRODUCT_TOGGLE",
+                    toggled.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send product toggle notification: " + e.getMessage());
+        }
+
+        return buildResponse(true, "Thay đổi trạng thái thành công", toggled, null, HttpStatus.OK);
     }
     // 🟢 Lấy sản phẩm theo ID danh mục
     @GetMapping("/category/{categoryId}")
@@ -101,6 +125,15 @@ public class ProductRestController {
 
         Product saved = productService.save(product);
 
+        try {
+            notifyService.notifyAdmins(
+                    String.format("Sản phẩm \"%s\" đã được thêm mới", saved.getName()),
+                    "PRODUCT_CREATED",
+                    saved.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send product create notification: " + e.getMessage());
+        }
+
         return buildResponse(true, "Thêm sản phẩm thành công", saved, null, HttpStatus.OK);
     }
 
@@ -117,6 +150,15 @@ public class ProductRestController {
         // update fields
         product.setId(id);
         Product updated = productService.save(product);
+
+        try {
+            notifyService.notifyAdmins(
+                    String.format("Sản phẩm \"%s\" đã được cập nhật", updated.getName()),
+                    "PRODUCT_UPDATED",
+                    updated.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send product update notification: " + e.getMessage());
+        }
 
         return buildResponse(true, "Cập nhật sản phẩm thành công", updated, null, HttpStatus.OK);
     }
@@ -228,6 +270,30 @@ public class ProductRestController {
         } catch (Exception e) {
             return buildResponse(false, "Không tìm thấy ảnh", null, e.getMessage(), HttpStatus.NOT_FOUND);
         }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> deleteProduct(@PathVariable long id) {
+        Product product = productService.getById(id);
+        if (product == null) {
+            return buildResponse(false, "Không tìm thấy sản phẩm", null, "Product not found", HttpStatus.NOT_FOUND);
+        }
+
+        boolean deleted = productService.deleteById(id);
+        if (!deleted) {
+            return buildResponse(false, "Không thể xóa sản phẩm", null, "Delete failed", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            notifyService.notifyAdmins(
+                    String.format("Sản phẩm \"%s\" đã bị xóa", product.getName()),
+                    "PRODUCT_DELETED",
+                    product.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send product delete notification: " + e.getMessage());
+        }
+
+        return buildResponse(true, "Xóa sản phẩm thành công", null, null, HttpStatus.OK);
     }
 
 

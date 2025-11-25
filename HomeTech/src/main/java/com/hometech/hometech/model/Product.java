@@ -22,7 +22,14 @@ public class Product {
     private String name;
     private double price;
     private int stock;
+    private String description;
 
+    public String getDescription() {
+        return description;
+    }
+    public void setDescription(String description) {
+        this.description = description;
+    }
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }

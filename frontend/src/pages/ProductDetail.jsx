@@ -22,6 +22,9 @@ function ProductDetail() {
   const [reviewContent, setReviewContent] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewResponses, setReviewResponses] = useState({});
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [favoriteUpdating, setFavoriteUpdating] = useState(false);
 
   useEffect(() => {
     loadProductData();
@@ -34,10 +37,35 @@ function ProductDetail() {
     }
   }, [userInfo]);
 
+  useEffect(() => {
+    const fetchFavoriteStatus = async () => {
+      if (!userInfo || !product) {
+        setIsFavorite(false);
+        return;
+      }
+      try {
+        setFavoriteLoading(true);
+        const response = await userAPI.checkFavorite(userInfo.id, product.id);
+        if (response.success) {
+          setIsFavorite(Boolean(response.data?.isFavorite));
+        } else {
+          setIsFavorite(false);
+        }
+      } catch (error) {
+        console.error('Error checking favorite status:', error);
+        setIsFavorite(false);
+      } finally {
+        setFavoriteLoading(false);
+      }
+    };
+
+    fetchFavoriteStatus();
+  }, [userInfo, product]);
+
   const loadProductData = async () => {
     try {
       setLoading(true);
-      
+
       const [productRes, imagesRes, reviewsRes, ratingRes] = await Promise.all([
         userAPI.getProductById(id),
         userAPI.getProductImages(id),
@@ -59,7 +87,7 @@ function ProductDetail() {
 
       const rating = ratingRes.data || 0;
       setAverageRating(rating);
-      
+
       // Load responses for all reviews
       const responsePromises = reviewsData.map(async (review) => {
         try {
@@ -69,7 +97,7 @@ function ProductDetail() {
           return { reviewId: review.id, response: null };
         }
       });
-      
+
       const responses = await Promise.all(responsePromises);
       const responsesMap = {};
       responses.forEach(({ reviewId, response }) => {
@@ -153,6 +181,34 @@ function ProductDetail() {
     }
   };
 
+  const handleToggleFavorite = async () => {
+    if (!userInfo) {
+      alert('Vui lòng đăng nhập để sử dụng danh sách yêu thích');
+      navigate('/login');
+      return;
+    }
+
+    if (!product || favoriteLoading || favoriteUpdating) {
+      return;
+    }
+
+    try {
+      setFavoriteUpdating(true);
+      if (isFavorite) {
+        await userAPI.removeFavorite(userInfo.id, product.id);
+        setIsFavorite(false);
+      } else {
+        await userAPI.addFavorite(userInfo.id, product.id);
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error('Error updating favorite:', error);
+      alert('Có lỗi xảy ra khi cập nhật danh sách yêu thích');
+    } finally {
+      setFavoriteUpdating(false);
+    }
+  };
+
   const handleIncreaseQuantity = () => {
     if (product && quantity < product.stock) {
       setQuantity(quantity + 1);
@@ -217,23 +273,23 @@ function ProductDetail() {
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
-    
+
     if (!userInfo) {
       alert('Vui lòng đăng nhập để đánh giá sản phẩm');
       navigate('/login');
       return;
     }
-    
+
     if (reviewRating === 0) {
       alert('Vui lòng chọn số sao đánh giá');
       return;
     }
-    
+
     if (!reviewContent.trim()) {
       alert('Vui lòng nhập nội dung đánh giá');
       return;
     }
-    
+
     try {
       setSubmittingReview(true);
       await userAPI.createReview(product.id, userInfo.id, reviewRating, reviewContent.trim());
@@ -374,7 +430,7 @@ function ProductDetail() {
 
         <div className={styles.productInfo}>
           <h1 className={styles.productName}>{product.name}</h1>
-          
+
           {averageRating > 0 && (
             <div className={styles.rating}>
               <div className={styles.ratingStars}>
@@ -439,20 +495,48 @@ function ProductDetail() {
           )}
 
           <div className={styles.actions}>
-            <button 
+            <button
               className={styles.addToCartButton}
               onClick={handleAddToCart}
               disabled={addingToCart || !userInfo || product.stock <= 0}
             >
               {addingToCart ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
             </button>
-            <button 
+            <button
               className={styles.buyNowButton}
               disabled={!userInfo || product.stock <= 0}
             >
               Mua ngay
             </button>
+            <button
+              type="button"
+              className={`${styles.favoriteButton} ${isFavorite ? styles.favoriteButtonActive : ''}`}
+              onClick={handleToggleFavorite}
+              disabled={favoriteLoading || favoriteUpdating}
+              title={isFavorite ? 'Xóa khỏi yêu thích' : 'Thêm vào yêu thích'}
+            >
+              <span className={styles.favoriteIconWrapper}>
+                <svg viewBox="0 0 24 24" className={styles.favoriteIcon}>
+                  <path
+                    d="M12 21.35l-1.45-1.32C6 15.36 3 12.28 3 8.5 3 6 5 4 7.5 4c1.74 0 3.41.81 4.5 2.09C13.09 4.81 14.76 4 16.5 4 19 4 21 6 21 8.5c0 3.78-3 6.86-7.55 11.54L12 21.35z"
+                    fill={isFavorite ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className={styles.favoritePulse} />
+              </span>
+            </button>
           </div>
+
+          {product.description && (
+            <div className={styles.descriptionSection}>
+              <h3>Mô tả sản phẩm</h3>
+              <p>{product.description}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -469,7 +553,7 @@ function ProductDetail() {
             </button>
           )}
         </div>
-        
+
         {/* Review Form */}
         {showReviewForm && userInfo && (
           <form className={styles.reviewForm} onSubmit={handleSubmitReview}>
@@ -511,7 +595,7 @@ function ProductDetail() {
             </div>
           </form>
         )}
-        
+
         {averageRating > 0 && (
           <div className={styles.ratingSummary}>
             <div className={styles.ratingSummaryLeft}>
@@ -573,7 +657,7 @@ function ProductDetail() {
                     ))}
                   </div>
                 )}
-                
+
                 {/* Admin Response */}
                 {reviewResponses[review.id] && (
                   <div className={styles.adminResponse}>

@@ -127,6 +127,7 @@ public class SecurityConfig {
                                 "/", "/home",
                                 "/auth/**",
                                 "/oauth2/**",
+                                "/payment/**",
                                 "/api/reviews/**",
                                 "/api/reviews/*/hide",
                                 "/api/reviews/*/show",

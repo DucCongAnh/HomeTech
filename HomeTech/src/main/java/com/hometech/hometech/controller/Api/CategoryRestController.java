@@ -3,6 +3,7 @@ package com.hometech.hometech.controller.Api;
 import com.hometech.hometech.model.Category;
 import com.hometech.hometech.model.Product;
 import com.hometech.hometech.service.CategoryService;
+import com.hometech.hometech.service.NotifyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,9 +15,12 @@ import java.util.*;
 public class CategoryRestController {
 
     private final CategoryService categoryService;
+    private final NotifyService notifyService;
 
-    public CategoryRestController(CategoryService categoryService) {
+    public CategoryRestController(CategoryService categoryService,
+                                  NotifyService notifyService) {
         this.categoryService = categoryService;
+        this.notifyService = notifyService;
     }
 
     // ---- TEMPLATE RESPONSE ----
@@ -120,6 +124,14 @@ public class CategoryRestController {
             }
             
             categoryService.save(category);
+            try {
+                notifyService.notifyAdmins(
+                        String.format("Danh mục \"%s\" đã được tạo", category.getName()),
+                        "CATEGORY_CREATED",
+                        category.getId());
+            } catch (Exception e) {
+                System.err.println("❌ Failed to send category create notification: " + e.getMessage());
+            }
             return buildResponse(true, "Tạo danh mục thành công", category, null, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return buildResponse(false, e.getMessage(), null, e.getMessage(), HttpStatus.BAD_REQUEST);
@@ -142,6 +154,14 @@ public class CategoryRestController {
 
         category.setId(id);
         categoryService.save(category);
+        try {
+            notifyService.notifyAdmins(
+                    String.format("Danh mục \"%s\" đã được cập nhật", category.getName()),
+                    "CATEGORY_UPDATED",
+                    category.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send category update notification: " + e.getMessage());
+        }
         return buildResponse(true, "Cập nhật danh mục thành công", category, null, HttpStatus.OK);
     }
 
@@ -155,6 +175,14 @@ public class CategoryRestController {
                     "Category not found", HttpStatus.NOT_FOUND);
 
         categoryService.delete(id);
+        try {
+            notifyService.notifyAdmins(
+                    String.format("Danh mục \"%s\" đã bị xóa", category.getName()),
+                    "CATEGORY_DELETED",
+                    category.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send category delete notification: " + e.getMessage());
+        }
         return buildResponse(true, "Xóa danh mục thành công", null, null, HttpStatus.OK);
     }
 }

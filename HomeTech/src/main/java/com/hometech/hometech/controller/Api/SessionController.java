@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/session")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class SessionController {
 
     private final SessionRegistry sessionRegistry;
