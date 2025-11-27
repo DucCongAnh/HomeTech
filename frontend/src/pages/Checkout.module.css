@@ -183,6 +183,49 @@
   padding: 6px 10px;
 }
 
+.voucherRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.voucherRow input {
+  flex: 1;
+}
+
+.applyVoucherButton {
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.applyVoucherButton:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.voucherMessage {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: #059669;
+}
+
+.voucherError {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.discountValue {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 .summaryTotal {
   display: flex;
   justify-content: space-between;

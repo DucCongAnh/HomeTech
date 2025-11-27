@@ -64,14 +64,14 @@ const formatDate = (dateString) => {
   });
 };
 
-const formatAddress = (deliveryAddress) => {
-  if (!deliveryAddress) return 'Chưa có địa chỉ giao hàng';
-  if (deliveryAddress.fullAddress) return deliveryAddress.fullAddress;
+const formatAddress = (orderInfo) => {
+  if (!orderInfo) return 'Chưa có địa chỉ giao hàng';
+  if (orderInfo.fullAddress && orderInfo.fullAddress !== '-') return orderInfo.fullAddress;
   const parts = [
-    deliveryAddress.street,
-    deliveryAddress.ward,
-    deliveryAddress.district,
-    deliveryAddress.city
+    orderInfo.street,
+    orderInfo.ward,
+    orderInfo.district,
+    orderInfo.city
   ].filter(Boolean);
   return parts.length ? parts.join(', ') : 'Chưa có địa chỉ giao hàng';
 };
@@ -425,15 +425,15 @@ function Orders() {
                   <ul className={styles.detailInfoList}>
                     <li>
                       <span>Người nhận:</span>
-                      <strong>{selectedOrder.deliveryAddress?.fullName || 'Không có'}</strong>
+                      <strong>{selectedOrder.orderInfo?.fullName || 'Không có'}</strong>
                     </li>
                     <li>
                       <span>Số điện thoại:</span>
-                      <strong>{selectedOrder.deliveryAddress?.phone || '-'}</strong>
+                      <strong>{selectedOrder.orderInfo?.phone || '-'}</strong>
                     </li>
                     <li>
                       <span>Địa chỉ:</span>
-                      <strong>{formatAddress(selectedOrder.deliveryAddress)}</strong>
+                      <strong>{formatAddress(selectedOrder.orderInfo)}</strong>
                     </li>
                   </ul>
                 </div>

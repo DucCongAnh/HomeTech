@@ -139,29 +139,45 @@ public class ProductRestController {
 
     // 🟢 Cập nhật sản phẩm
     @PutMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> updateProduct(@PathVariable long id, @RequestBody Product product) {
+public ResponseEntity<Map<String, Object>> updateProduct(@PathVariable long id, @RequestBody Product product) {
 
-        Product existing = productService.getById(id);
+    Product existing = productService.getById(id);
 
-        if (existing == null) {
-            return buildResponse(false, "Không tìm thấy sản phẩm", null, "Product not found", HttpStatus.NOT_FOUND);
-        }
-
-        // update fields
-        product.setId(id);
-        Product updated = productService.save(product);
-
-        try {
-            notifyService.notifyAdmins(
-                    String.format("Sản phẩm \"%s\" đã được cập nhật", updated.getName()),
-                    "PRODUCT_UPDATED",
-                    updated.getId());
-        } catch (Exception e) {
-            System.err.println("❌ Failed to send product update notification: " + e.getMessage());
-        }
-
-        return buildResponse(true, "Cập nhật sản phẩm thành công", updated, null, HttpStatus.OK);
+    if (existing == null) {
+        return buildResponse(false, "Không tìm thấy sản phẩm", null, "Product not found", HttpStatus.NOT_FOUND);
     }
+
+    // Copy các trường cần update từ request body sang existing
+    // KHÔNG copy images để tránh xóa orphan
+    existing.setName(product.getName());
+    existing.setPrice(product.getPrice());
+    existing.setStock(product.getStock());
+    existing.setDescription(product.getDescription());
+    existing.setHidden(product.isHidden());
+
+    // Xử lý category nếu có thay đổi
+    if (product.getCategory() != null && product.getCategory().getId() != null) {
+        Category category = categoryService.getById(product.getCategory().getId());
+        if (category == null) {
+            return buildResponse(false, "Category không tồn tại", null, "Invalid category", HttpStatus.BAD_REQUEST);
+        }
+        existing.setCategory(category);
+    }
+
+    // Save existing (giữ nguyên images cũ)
+    Product updated = productService.save(existing);
+
+    try {
+        notifyService.notifyAdmins(
+                String.format("Sản phẩm \"%s\" đã được cập nhật", updated.getName()),
+                "PRODUCT_UPDATED",
+                updated.getId());
+    } catch (Exception e) {
+        System.err.println("❌ Failed to send product update notification: " + e.getMessage());
+    }
+
+    return buildResponse(true, "Cập nhật sản phẩm thành công", updated, null, HttpStatus.OK);
+}
 
     // 🟢 Lấy thông tin danh mục và thống kê
     @GetMapping("/category/{categoryId}/info")

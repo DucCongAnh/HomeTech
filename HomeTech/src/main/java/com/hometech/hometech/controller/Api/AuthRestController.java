@@ -1,6 +1,9 @@
 package com.hometech.hometech.controller.Api;
 
+import com.hometech.hometech.Repository.AddressRepository;
 import com.hometech.hometech.Repository.UserRepository;
+import com.hometech.hometech.model.Address;
+import com.hometech.hometech.model.Customer;
 import com.hometech.hometech.model.User;
 import com.hometech.hometech.service.AuthService;
 import jakarta.mail.MessagingException;
@@ -30,11 +33,14 @@ public class AuthRestController {
 
     private final AuthService authService;
     private final UserRepository userRepository;
+    private final AddressRepository addressRepository;
 
     public AuthRestController(AuthService authService
-                            ,UserRepository userRepository) {
+                            ,UserRepository userRepository,
+                              AddressRepository addressRepository) {
         this.authService = authService;
         this.userRepository = userRepository;
+        this.addressRepository = addressRepository;
     }
 
     @PostMapping("/register")
@@ -357,6 +363,24 @@ public class AuthRestController {
             userData.put("id", user.getId());
             userData.put("fullName", user.getFullName());
             userData.put("email", user.getAccount() != null ? user.getAccount().getEmail() : null);
+            userData.put("phone", user.getPhone());
+
+            Address primaryAddress = null;
+            if (user instanceof Customer customer) {
+                primaryAddress = addressRepository.findFirstByCustomer_IdOrderByIdAsc(customer.getId()).orElse(null);
+            }
+
+            if (primaryAddress != null) {
+                userData.put("addressLine", primaryAddress.getStreet());
+                userData.put("commune", primaryAddress.getWard());
+                userData.put("district", primaryAddress.getDistrict());
+                userData.put("city", primaryAddress.getCity());
+            } else {
+                userData.put("addressLine", null);
+                userData.put("commune", null);
+                userData.put("district", null);
+                userData.put("city", null);
+            }
         }
 
         response.put("success", true);

@@ -1,11 +1,13 @@
 package com.hometech.hometech.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class PreviewOrderResponse {
-    public double subtotal;
-    public double discount;
-    public double finalTotal;
-    public boolean voucherValid;
-    public String voucherMessage;
+    private final double subtotal;
+    private final double discount;
+    private final double finalTotal;
+    private final boolean voucherValid;
+    private final String voucherMessage;
 
     public PreviewOrderResponse(double subtotal, double discount, double finalTotal,
                                 boolean voucherValid, String voucherMessage) {
@@ -14,5 +16,30 @@ public class PreviewOrderResponse {
         this.finalTotal = finalTotal;
         this.voucherValid = voucherValid;
         this.voucherMessage = voucherMessage;
+    }
+
+    public double getSubtotal() {
+        return subtotal;
+    }
+
+    public double getDiscount() {
+        return discount;
+    }
+
+    public double getFinalTotal() {
+        return finalTotal;
+    }
+
+    public boolean isVoucherValid() {
+        return voucherValid;
+    }
+
+    public String getVoucherMessage() {
+        return voucherMessage;
+    }
+
+    @JsonProperty("message")
+    public String getMessage() {
+        return voucherMessage;
     }
 }

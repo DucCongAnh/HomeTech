@@ -109,9 +109,15 @@ public class Order {
     @JsonIgnore
     private Voucher voucher;
 
+    @Column(name = "voucher_code_snapshot")
+    private String voucherCodeSnapshot;
+
+    @Column(name = "discount_amount")
+    private Double discountAmount = 0.0;
+
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "order_address_id")
-    private OrderAddress deliveryAddress;
+    @JoinColumn(name = "order_info_id")
+    private OrderInfo orderInfo;
 
     public PaymentMethod getPaymentMethod() {
         return paymentMethod;
@@ -121,12 +127,28 @@ public class Order {
         this.paymentMethod = paymentMethod;
     }
 
-    public OrderAddress getDeliveryAddress() {
-        return deliveryAddress;
+    public OrderInfo getOrderInfo() {
+        return orderInfo;
     }
 
-    public void setDeliveryAddress(OrderAddress deliveryAddress) {
-        this.deliveryAddress = deliveryAddress;
+    public void setOrderInfo(OrderInfo orderInfo) {
+        this.orderInfo = orderInfo;
+    }
+
+    public String getVoucherCodeSnapshot() {
+        return voucherCodeSnapshot;
+    }
+
+    public void setVoucherCodeSnapshot(String voucherCodeSnapshot) {
+        this.voucherCodeSnapshot = voucherCodeSnapshot;
+    }
+
+    public Double getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(Double discountAmount) {
+        this.discountAmount = discountAmount;
     }
 }
 

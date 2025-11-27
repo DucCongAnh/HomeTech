@@ -604,6 +604,13 @@ export const userAPI = {
     return response.data;
   },
 
+  previewOrder: async (userId, voucherCode = null) => {
+    const response = await api.get('/orders/preview', {
+      params: { userId, voucherCode },
+    });
+    return response.data;
+  },
+
   getOrdersByStatus: async (userId, status) => {
     const response = await api.get(`/orders/user/${userId}/status/${status}`);
     return response.data;

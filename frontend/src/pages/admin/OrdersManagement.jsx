@@ -51,6 +51,15 @@ const dedupeOrdersById = (orders) => {
   return Array.from(map.values());
 };
 
+const formatOrderAddress = (orderInfo) => {
+  if (!orderInfo) return 'Chưa cập nhật';
+  if (orderInfo.fullAddress && orderInfo.fullAddress !== '-') {
+    return orderInfo.fullAddress;
+  }
+  const parts = [orderInfo.street, orderInfo.ward, orderInfo.district, orderInfo.city].filter(Boolean);
+  return parts.length ? parts.join(', ') : 'Chưa cập nhật';
+};
+
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -138,11 +147,17 @@ export default function OrdersManagement() {
     const term = search.trim().toLowerCase();
     return orders.filter((order) => {
       const matchStatus = statusFilter === 'ALL' || order.status === statusFilter;
+      const snapshot = order.orderInfo || {};
+      const contactName = snapshot.fullName?.toLowerCase() || order.customer?.username?.toLowerCase();
+      const contactEmail = snapshot.email?.toLowerCase() || order.customer?.email?.toLowerCase();
+      const contactPhone = snapshot.phone || order.customer?.phone;
+      const normalizedPhone = contactPhone ? contactPhone.toString().toLowerCase() : '';
       const matchSearch =
         !term ||
         order.id?.toString().includes(term) ||
-        order.customer?.username?.toLowerCase().includes(term) ||
-        order.customer?.email?.toLowerCase().includes(term);
+        contactName?.includes(term) ||
+        contactEmail?.includes(term) ||
+        normalizedPhone.includes(term);
       return matchStatus && matchSearch;
     });
   }, [orders, search, statusFilter]);
@@ -284,8 +299,10 @@ export default function OrdersManagement() {
                 <tr key={order.id} onClick={() => setSelectedOrder(order)}>
                   <td>#{order.id}</td>
                   <td className={styles.categoryName}>
-                    <div>{order.customer?.username || 'Khách lẻ'}</div>
-                    <small style={{ color: '#6b7280' }}>{order.customer?.email || '—'}</small>
+                    <div>{order.orderInfo?.fullName || order.customer?.username || 'Khách lẻ'}</div>
+                    <small style={{ color: '#6b7280' }}>
+                      {order.orderInfo?.email || order.customer?.email || '—'}
+                    </small>
                   </td>
                   <td>
                     <span
@@ -334,10 +351,10 @@ export default function OrdersManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <div className="space-y-3">
-                <p><strong>Khách hàng:</strong> {selectedOrder.customer?.username || 'Khách lẻ'}</p>
-                <p><strong>Email:</strong> {selectedOrder.customer?.email || '—'}</p>
-                <p><strong>Số điện thoại:</strong> {selectedOrder.customer?.phone || '—'}</p>
-                <p><strong>Địa chỉ giao:</strong> {selectedOrder.deliveryAddress?.fullAddress || 'Chưa cập nhật'}</p>
+                <p><strong>Khách hàng:</strong> {selectedOrder.orderInfo?.fullName || selectedOrder.customer?.username || 'Khách lẻ'}</p>
+                <p><strong>Email:</strong> {selectedOrder.orderInfo?.email || selectedOrder.customer?.email || '—'}</p>
+                <p><strong>Số điện thoại:</strong> {selectedOrder.orderInfo?.phone || selectedOrder.customer?.phone || '—'}</p>
+                <p><strong>Địa chỉ giao:</strong> {formatOrderAddress(selectedOrder.orderInfo)}</p>
               </div>
               <div className="space-y-3">
                 <p><strong>Tổng tiền:</strong> <span className="text-xl font-semibold text-green-600">{formatCurrency(selectedOrder.totalAmount)}</span></p>

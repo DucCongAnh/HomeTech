@@ -18,6 +18,8 @@ import com.hometech.hometech.enums.PaymentMethod;
 @Service
 public class OrderService {
 
+    private static final String PLACEHOLDER_VALUE = "chưa cập nhật";
+
     private final OrderRepository orderRepo;
     private final OrderItemRepository orderItemRepo;
     private final CartItemRepository cartRepo;
@@ -26,6 +28,7 @@ public class OrderService {
     private final AddressRepository addressRepo;
     private final VoucherRepository voucherRepo;
     private final PaymentRepository paymentRepository;
+    private final ProductRepository productRepository;
 
 
     public OrderService(OrderRepository orderRepo, OrderItemRepository orderItemRepo,
@@ -33,7 +36,8 @@ public class OrderService {
                         NotifyService notifyService,
                         AddressRepository addressRepo,
                         VoucherRepository voucherRepo,
-                        PaymentRepository paymentRepository) {
+                        PaymentRepository paymentRepository,
+                        ProductRepository productRepository) {
         this.orderRepo = orderRepo;
         this.orderItemRepo = orderItemRepo;
         this.cartRepo = cartRepo;
@@ -42,6 +46,7 @@ public class OrderService {
         this.addressRepo = addressRepo;
         this.voucherRepo=voucherRepo;
         this.paymentRepository = paymentRepository;
+        this.productRepository = productRepository;
     }
 
     // 🟢 Tạo đơn hàng từ giỏ hàng của user cụ thể
@@ -53,13 +58,17 @@ public class OrderService {
         // (2) Address
         Address address = addressRepo.findFirstByCustomer_IdOrderByIdAsc(customer.getId())
                 .orElseThrow(() -> new RuntimeException("Khách hàng chưa có địa chỉ giao hàng. Vui lòng cập nhật hồ sơ trước khi đặt hàng."));
-        OrderAddress orderAddress = new OrderAddress();
-        orderAddress.setFullName(customer.getFullName());
-        orderAddress.setPhone(customer.getPhone());
-        orderAddress.setStreet(address.getStreet());
-        orderAddress.setWard(address.getWard());
-        orderAddress.setDistrict(address.getDistrict());
-        orderAddress.setCity(address.getCity());
+        validateAddress(address);
+        validateCustomerContact(customer);
+
+        OrderInfo orderInfo = new OrderInfo();
+        orderInfo.setFullName(customer.getFullName());
+        orderInfo.setEmail(resolveCustomerEmail(customer));
+        orderInfo.setPhone(customer.getPhone());
+        orderInfo.setStreet(address.getStreet());
+        orderInfo.setWard(address.getWard());
+        orderInfo.setDistrict(address.getDistrict());
+        orderInfo.setCity(address.getCity());
 
         // (3) Cart
         if (customer.getCart() == null)
@@ -73,15 +82,29 @@ public class OrderService {
         double subtotal = 0;
         List<OrderItem> orderItems = new ArrayList<>();
 
+        List<Product> productsToUpdate = new ArrayList<>();
+
         for (CartItem c : cartItems) {
-            double itemTotal = c.getProduct().getPrice() * c.getQuantity();
+            Product product = productRepository.findById(c.getProduct().getId())
+                    .orElseThrow(() -> new RuntimeException("Sản phẩm trong giỏ không còn tồn tại."));
+
+            if (product.getStock() < c.getQuantity()) {
+                throw new RuntimeException(String.format("Sản phẩm %s chỉ còn %d sản phẩm trong kho.",
+                        product.getName(), product.getStock()));
+            }
+
+            double itemTotal = product.getPrice() * c.getQuantity();
             subtotal += itemTotal;
 
             OrderItem oi = new OrderItem();
-            oi.setProduct(c.getProduct());
+            oi.setProduct(product);
             oi.setQuantity(c.getQuantity());
-            oi.setPrice(c.getProduct().getPrice());
+            oi.setPrice(product.getPrice());
             orderItems.add(oi);
+
+            product.setStock(product.getStock() - c.getQuantity());
+            product.setSoldCount(product.getSoldCount() + c.getQuantity());
+            productsToUpdate.add(product);
         }
 
         // (5) Áp dụng voucher nếu có
@@ -128,19 +151,22 @@ public class OrderService {
         // (6) Tạo Order
         Order order = new Order();
         order.setCustomer(customer);
-        order.setDeliveryAddress(orderAddress);
+        order.setOrderInfo(orderInfo);
         order.setTotalAmount(finalTotal);
         order.setStatus(OrderStatus.WAITING_CONFIRMATION);
         order.setCreatedAt(LocalDateTime.now());
         order.setVoucher(voucher);   // ⬅ ⬅ Gắn voucher vào Order
         order.setPaymentMethod(paymentMethod != null ? paymentMethod : PaymentMethod.COD);
         order.setItems(orderItems);
+        order.setVoucherCodeSnapshot(voucher != null ? voucher.getCode() : null);
+        order.setDiscountAmount(discount);
 
         orderItems.forEach(i -> i.setOrder(order));
 
         // (7) Lưu DB
         orderRepo.save(order);
         orderItemRepo.saveAll(orderItems);
+        productRepository.saveAll(productsToUpdate);
 
         Payment payment = order.getPayment();
         if (payment == null) {
@@ -153,6 +179,12 @@ public class OrderService {
         payment.setStatus(method == PaymentMethod.COD ? "PENDING" : "AWAITING_PAYMENT");
         paymentRepository.save(payment);
         order.setPayment(payment);
+
+        int earnedPoints = (int) (finalTotal / 10_000);
+        if (earnedPoints > 0) {
+            customer.setLoyaltyPoints(customer.getLoyaltyPoints() + earnedPoints);
+            customerRepo.save(customer);
+        }
 
         try {
             notifyService.createNotification(customer.getId(),
@@ -453,5 +485,44 @@ public class OrderService {
         result.put("orderCount", filteredOrders.size());
 
         return result;
+    }
+
+    private void validateAddress(Address address) {
+        if (address == null) {
+            throw new RuntimeException("Địa chỉ giao hàng chưa được thiết lập. Vui lòng cập nhật hồ sơ trước khi đặt hàng.");
+        }
+        if (isPlaceholder(address.getStreet())
+                || isPlaceholder(address.getWard())
+                || isPlaceholder(address.getDistrict())
+                || isPlaceholder(address.getCity())) {
+            throw new RuntimeException("Địa chỉ giao hàng không hợp lệ. Vui lòng cập nhật đầy đủ thông tin trước khi đặt hàng.");
+        }
+    }
+
+    private void validateCustomerContact(Customer customer) {
+        if (customer == null) {
+            throw new RuntimeException("Không thể xác định thông tin khách hàng.");
+        }
+        if (isPlaceholder(customer.getFullName()) || isPlaceholder(customer.getPhone())) {
+            throw new RuntimeException("Thông tin cá nhân chưa hoàn tất. Vui lòng cập nhật họ tên và số điện thoại trước khi đặt hàng.");
+        }
+        if (isPlaceholder(resolveCustomerEmail(customer))) {
+            throw new RuntimeException("Email chưa được cập nhật. Vui lòng cập nhật email trước khi đặt hàng.");
+        }
+    }
+
+    private boolean isPlaceholder(String value) {
+        if (value == null) {
+            return true;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() || PLACEHOLDER_VALUE.equalsIgnoreCase(normalized);
+    }
+
+    private String resolveCustomerEmail(Customer customer) {
+        if (customer == null || customer.getAccount() == null) {
+            return null;
+        }
+        return customer.getAccount().getEmail();
     }
 }

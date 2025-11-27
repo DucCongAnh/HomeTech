@@ -41,6 +41,10 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [voucherCode, setVoucherCode] = useState('');
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [voucherPreview, setVoucherPreview] = useState(null);
+  const [voucherFeedback, setVoucherFeedback] = useState('');
+  const [voucherError, setVoucherError] = useState('');
 
   useEffect(() => {
     loadUserInfo();
@@ -94,6 +98,21 @@ export default function Checkout() {
     [cartItems]
   );
 
+  const pricing = useMemo(() => {
+    if (voucherPreview) {
+      return {
+        subtotal: voucherPreview.subtotal ?? subtotal,
+        discount: voucherPreview.discount ?? 0,
+        finalTotal: voucherPreview.finalTotal ?? subtotal,
+      };
+    }
+    return {
+      subtotal,
+      discount: 0,
+      finalTotal: subtotal,
+    };
+  }, [voucherPreview, subtotal]);
+
   const getPaymentLabel = () => {
     const option = PAYMENT_OPTIONS.find((opt) => opt.id === paymentMethod);
     return option?.label || 'Thanh toán';
@@ -138,6 +157,37 @@ export default function Checkout() {
       alert(error?.response?.data?.error || error.message || 'Không thể đặt hàng');
     } finally {
       setPlacingOrder(false);
+    }
+  };
+
+  const handleApplyVoucher = async () => {
+    if (!userInfo?.id) {
+      navigate('/login');
+      return;
+    }
+    setVoucherError('');
+    setVoucherFeedback('');
+
+    try {
+      setApplyingVoucher(true);
+      const trimmedCode = voucherCode.trim();
+      const response = await userAPI.previewOrder(
+        userInfo.id,
+        trimmedCode.length ? trimmedCode : null
+      );
+      setVoucherPreview(response);
+      setVoucherFeedback(response?.message || 'Áp dụng voucher thành công');
+    } catch (error) {
+      console.error('handleApplyVoucher error:', error);
+      setVoucherPreview(null);
+      setVoucherError(
+        error?.response?.data?.error ||
+          error?.response?.data?.message ||
+          error.message ||
+          'Không thể áp dụng voucher. Vui lòng thử lại.'
+      );
+    } finally {
+      setApplyingVoucher(false);
     }
   };
 
@@ -248,7 +298,7 @@ export default function Checkout() {
             </div>
             <div className={styles.summaryRow}>
               <span>Tạm tính</span>
-              <span>{formatCurrency(subtotal)}</span>
+              <span>{formatCurrency(pricing.subtotal)}</span>
             </div>
             <div className={styles.summaryRow}>
               <span>Phí vận chuyển</span>
@@ -256,17 +306,39 @@ export default function Checkout() {
             </div>
             <div className={styles.summaryRow}>
               <label htmlFor="voucherCode">Voucher</label>
-              <input
-                id="voucherCode"
-                type="text"
-                placeholder="Nhập mã nếu có"
-                value={voucherCode}
-                onChange={(event) => setVoucherCode(event.target.value)}
-              />
+              <div className={styles.voucherRow}>
+                <input
+                  id="voucherCode"
+                  type="text"
+                  placeholder="Nhập mã nếu có"
+                  value={voucherCode}
+                  onChange={(event) => setVoucherCode(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.applyVoucherButton}
+                  onClick={handleApplyVoucher}
+                  disabled={applyingVoucher || cartItems.length === 0}
+                >
+                  {applyingVoucher ? 'Đang áp dụng...' : 'Áp dụng'}
+                </button>
+              </div>
             </div>
+            {voucherFeedback && (
+              <p className={styles.voucherMessage}>{voucherFeedback}</p>
+            )}
+            {voucherError && <p className={styles.voucherError}>{voucherError}</p>}
+            {pricing.discount > 0 && (
+              <div className={styles.summaryRow}>
+                <span>Giảm giá</span>
+                <span className={styles.discountValue}>
+                  -{formatCurrency(pricing.discount)}
+                </span>
+              </div>
+            )}
             <div className={styles.summaryTotal}>
               <span>Tổng cộng</span>
-              <span>{formatCurrency(subtotal)}</span>
+              <span>{formatCurrency(pricing.finalTotal)}</span>
             </div>
             <button
               className={styles.placeOrderButton}
@@ -275,7 +347,7 @@ export default function Checkout() {
             >
               {placingOrder
                 ? 'Đang xử lý...'
-                : `${getPaymentLabel()} (${formatCurrency(subtotal)})`}
+                : `${getPaymentLabel()} (${formatCurrency(pricing.finalTotal)})`}
             </button>
             <p className={styles.notice}>
               Bằng việc đặt hàng, bạn đồng ý với{' '}
