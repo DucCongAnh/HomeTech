@@ -12,6 +12,9 @@ function UsersManagement() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [userOrders, setUserOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [statusUpdatingUserId, setStatusUpdatingUserId] = useState(null);
 
   useEffect(() => {
     loadUsers();
@@ -20,6 +23,16 @@ function UsersManagement() {
   useEffect(() => {
     filterUsers();
   }, [users, searchTerm]);
+
+  const isUserEnabled = (user) => user?.account?.enabled !== false;
+
+  const getRoleString = (user) => {
+    const role = user?.account?.role;
+    if (!role) return '';
+    if (typeof role === 'string') return role;
+    if (typeof role === 'object') return role.name || role.toString();
+    return String(role);
+  };
 
   const loadUsers = async () => {
     try {
@@ -53,28 +66,15 @@ function UsersManagement() {
         if (!user) {
           return false;
         }
-        
-        // Nếu không có account, bỏ qua
+
         if (!user.account) {
           console.log('User', user.id, 'has no account');
           return false;
         }
-        
-        // Check role - có thể là string "USER" hoặc enum object
-        const role = user.account.role;
-        let roleString = '';
-        if (typeof role === 'string') {
-          roleString = role;
-        } else if (role && typeof role === 'object') {
-          roleString = role.name || role.toString();
-        } else if (role !== null && role !== undefined) {
-          roleString = String(role);
-        }
-        
+
+        const roleString = getRoleString(user);
         console.log('User', user.id, 'role:', roleString, 'account:', user.account);
-        // Check if role is USER (not ADMIN)
-        const isUser = roleString === 'USER' || roleString === 'ROLE_USER';
-        return isUser;
+        return roleString === 'USER' || roleString === 'ROLE_USER';
       });
       
       console.log('Filtered customers count:', customers.length);
@@ -109,10 +109,67 @@ function UsersManagement() {
     setFilteredUsers(filtered);
   };
 
+  const handleToggleUserStatus = async (user) => {
+    if (!user) return;
+
+    const currentlyEnabled = isUserEnabled(user);
+    const confirmMessage = currentlyEnabled
+      ? 'Bạn có chắc muốn khóa tài khoản người dùng này?'
+      : 'Bạn có chắc muốn mở khóa tài khoản người dùng này?';
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      setStatusUpdatingUserId(user.id);
+      await adminAPI.updateUserStatus(user.id, !currentlyEnabled);
+
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === user.id
+            ? {
+                ...u,
+                account: {
+                  ...u.account,
+                  enabled: !currentlyEnabled,
+                },
+              }
+            : u
+        )
+      );
+
+      setSelectedUser(prev =>
+        prev && prev.id === user.id
+          ? {
+              ...prev,
+              account: {
+                ...prev.account,
+                enabled: !currentlyEnabled,
+              },
+            }
+          : prev
+      );
+
+      setUserProfile(prev =>
+        prev && prev.id === user.id
+          ? { ...prev, enabled: !currentlyEnabled }
+          : prev
+      );
+    } catch (error) {
+      console.error('Failed to update user status:', error);
+      alert('Không thể cập nhật trạng thái tài khoản');
+    } finally {
+      setStatusUpdatingUserId(null);
+    }
+  };
+
   const handleViewProfile = async (userId) => {
     try {
       setLoadingProfile(true);
       setShowProfileModal(true);
+      setUserOrders([]);
+      setLoadingOrders(true);
       
       // Load user info
       let userData = null;
@@ -128,14 +185,18 @@ function UsersManagement() {
           alert('Có lỗi khi tải thông tin người dùng: ' + (userError.response?.data?.message || userError.message));
         }
         setShowProfileModal(false);
+        setLoadingOrders(false);
         return;
       }
       
       if (!userData) {
         alert('Không tìm thấy thông tin người dùng');
         setShowProfileModal(false);
+        setLoadingOrders(false);
         return;
       }
+
+      setSelectedUser(userData);
       
       // Load detailed profile (có thể fail nếu user chưa có profile hoặc không phải Customer)
       let profileData = {};
@@ -160,8 +221,24 @@ function UsersManagement() {
         addressLine: profileData?.addressLine || '',
         commune: profileData?.commune || '',
         district: profileData?.district || '',
-        city: profileData?.city || ''
+        city: profileData?.city || '',
+        enabled: userData?.account?.enabled !== false
       });
+
+      try {
+        const ordersResponse = await adminAPI.getOrdersByUser(userId);
+        const ordersData = Array.isArray(ordersResponse?.data)
+          ? ordersResponse.data
+          : Array.isArray(ordersResponse)
+            ? ordersResponse
+            : [];
+        setUserOrders(ordersData);
+      } catch (ordersError) {
+        console.warn('Could not load user orders:', ordersError);
+        setUserOrders([]);
+      } finally {
+        setLoadingOrders(false);
+      }
     } catch (error) {
       console.error('Error loading user profile:', error);
       console.error('Error details:', error.response?.data);
@@ -169,7 +246,15 @@ function UsersManagement() {
       setShowProfileModal(false);
     } finally {
       setLoadingProfile(false);
+      setLoadingOrders(false);
     }
+  };
+
+  const handleCloseModal = () => {
+    setShowProfileModal(false);
+    setUserProfile(null);
+    setUserOrders([]);
+    setSelectedUser(null);
   };
 
   const formatDate = (dateString) => {
@@ -205,6 +290,44 @@ function UsersManagement() {
     if (hasCity) parts.push(userProfile.city);
     
     return parts.length > 0 ? parts.join(', ') : 'Chưa cập nhật';
+  };
+
+  const formatCurrency = (amount) => {
+    if (amount == null) return '0₫';
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount);
+  };
+
+  const formatOrderDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const renderStatusBadge = (enabled) => (
+    <span className={`${styles.statusBadge} ${enabled ? styles.statusActive : styles.statusLocked}`}>
+      {enabled ? 'Đang hoạt động' : 'Đã khóa'}
+    </span>
+  );
+
+  const orderStatusMap = {
+    WAITING_CONFIRMATION: { label: 'Chờ xác nhận', color: styles.statusWarning },
+    CONFIRMED: { label: 'Đã xác nhận', color: styles.statusInfo },
+    SHIPPED: { label: 'Đang giao', color: styles.statusPurple },
+    COMPLETED: { label: 'Hoàn thành', color: styles.statusSuccess },
+    CANCELLED: { label: 'Đã hủy', color: styles.statusDanger },
+  };
+
+  const renderOrderStatus = (status) => {
+    const info = orderStatusMap[status] || { label: status || 'Không xác định', color: styles.statusMuted };
+    return <span className={`${styles.orderStatus} ${info.color}`}>{info.label}</span>;
   };
 
   if (loading) {
@@ -250,27 +373,45 @@ function UsersManagement() {
                 <th>Họ và tên</th>
                 <th>Email</th>
                 <th>Số điện thoại</th>
+                <th>Trạng thái</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.id}</td>
-                  <td>{user.account?.username || 'N/A'}</td>
-                  <td>{user.fullName || 'Chưa cập nhật'}</td>
-                  <td>{user.account?.email || 'N/A'}</td>
-                  <td>{user.phone || 'Chưa cập nhật'}</td>
-                  <td>
-                    <button
-                      className={styles.viewButton}
-                      onClick={() => handleViewProfile(user.id)}
-                    >
-                      Xem profile
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredUsers.map((user) => {
+                const enabled = isUserEnabled(user);
+                return (
+                  <tr key={user.id}>
+                    <td>{user.id}</td>
+                    <td>{user.account?.username || 'N/A'}</td>
+                    <td>{user.fullName || 'Chưa cập nhật'}</td>
+                    <td>{user.account?.email || 'N/A'}</td>
+                    <td>{user.phone || 'Chưa cập nhật'}</td>
+                    <td>{renderStatusBadge(enabled)}</td>
+                    <td>
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.viewButton}
+                          onClick={() => handleViewProfile(user.id)}
+                        >
+                          Xem profile
+                        </button>
+                        <button
+                          className={`${styles.lockButton} ${enabled ? styles.locked : styles.unlocked}`}
+                          disabled={statusUpdatingUserId === user.id}
+                          onClick={() => handleToggleUserStatus(user)}
+                        >
+                          {statusUpdatingUserId === user.id
+                            ? 'Đang cập nhật...'
+                            : enabled
+                              ? 'Khóa'
+                              : 'Mở khóa'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -278,13 +419,13 @@ function UsersManagement() {
 
       {/* Profile Modal */}
       {showProfileModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowProfileModal(false)}>
+        <div className={styles.modalOverlay} onClick={handleCloseModal}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>Thông tin người dùng</h2>
               <button
                 className={styles.modalClose}
-                onClick={() => setShowProfileModal(false)}
+                onClick={handleCloseModal}
               >
                 ✕
               </button>
@@ -302,6 +443,20 @@ function UsersManagement() {
                     {userProfile.fullName?.charAt(0)?.toUpperCase() || userProfile.username?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
                   <h3 className={styles.profileName}>{userProfile.fullName || userProfile.username}</h3>
+                  <div className={styles.modalActionsRow}>
+                    {renderStatusBadge(userProfile.enabled)}
+                    <button
+                      className={`${styles.lockButton} ${userProfile.enabled ? styles.locked : styles.unlocked}`}
+                      disabled={statusUpdatingUserId === userProfile.id}
+                      onClick={() => handleToggleUserStatus(selectedUser || { id: userProfile.id, account: { enabled: userProfile.enabled } })}
+                    >
+                      {statusUpdatingUserId === userProfile.id
+                        ? 'Đang cập nhật...'
+                        : userProfile.enabled
+                          ? 'Khóa tài khoản'
+                          : 'Mở khóa tài khoản'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className={styles.infoSection}>
@@ -333,6 +488,47 @@ function UsersManagement() {
                     <label>Địa chỉ:</label>
                     <span>{formatAddress()}</span>
                   </div>
+                </div>
+
+                <div className={styles.ordersSection}>
+                  <div className={styles.ordersHeader}>
+                    <h3>Đơn hàng đã đặt</h3>
+                    {loadingOrders && <div className={styles.smallSpinner}></div>}
+                  </div>
+
+                  {loadingOrders ? (
+                    <div className={styles.ordersLoading}>
+                      <div className={styles.spinner}></div>
+                      <p>Đang tải đơn hàng...</p>
+                    </div>
+                  ) : userOrders.length === 0 ? (
+                    <div className={styles.ordersEmpty}>
+                      <p>Người dùng chưa có đơn hàng nào</p>
+                    </div>
+                  ) : (
+                    <div className={styles.ordersTableWrapper}>
+                      <table className={styles.ordersTable}>
+                        <thead>
+                          <tr>
+                            <th>Mã đơn</th>
+                            <th>Ngày đặt</th>
+                            <th>Tổng tiền</th>
+                            <th>Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userOrders.map((order) => (
+                            <tr key={order.id}>
+                              <td>#{order.id}</td>
+                              <td>{formatOrderDate(order.orderDate)}</td>
+                              <td>{formatCurrency(order.totalAmount)}</td>
+                              <td>{renderOrderStatus(order.status)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

@@ -10,6 +10,7 @@ import com.hometech.hometech.model.Product;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,6 +55,50 @@ public class CartService {
         }
     }
 
+    // Xóa các item không hợp lệ (sản phẩm ẩn/hết hàng hoặc số lượng <= 0)
+    private List<CartItem> cleanupCartItems(Cart cart) {
+        if (cart == null) {
+            return List.of();
+        }
+
+        List<CartItem> items = new ArrayList<>(cartRepo.findByCart(cart));
+        boolean mutated = false;
+
+        for (CartItem item : items) {
+            Product product = item.getProduct();
+            boolean invalidProduct = (product == null) || product.isHidden() || product.getStock() <= 0;
+            boolean invalidQuantity = item.getQuantity() <= 0;
+
+            if (invalidProduct || invalidQuantity) {
+                cartRepo.delete(item);
+                mutated = true;
+            }
+        }
+
+        return mutated ? cartRepo.findByCart(cart) : items;
+    }
+
+    private void validateProductAvailability(Product product) {
+        if (product.isHidden()) {
+            throw new RuntimeException("Sản phẩm đã bị ẩn, không thể thêm vào giỏ hàng");
+        }
+        if (product.getStock() <= 0) {
+            throw new RuntimeException("Sản phẩm đã hết hàng");
+        }
+    }
+
+    private int ensureQuantityWithinStock(int requestedQuantity, Product product) {
+        if (requestedQuantity <= 0) {
+            throw new RuntimeException("Số lượng phải lớn hơn 0");
+        }
+
+        if (requestedQuantity > product.getStock()) {
+            throw new RuntimeException("Số lượng vượt quá tồn kho");
+        }
+
+        return requestedQuantity;
+    }
+
     // ===== Public APIs =====
 
     // Xem tất cả items (admin)
@@ -66,8 +111,7 @@ public class CartService {
         Customer customer = getCustomerByUserIdOrThrow(userId);
         if (customer.getCart() == null) return List.of();
         // findByCart with @EntityGraph will eagerly load product
-        List<CartItem> items = cartRepo.findByCart(customer.getCart());
-        return items;
+        return cleanupCartItems(customer.getCart());
     }
 
 
@@ -77,6 +121,8 @@ public class CartService {
 
         Product product = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found with id=" + productId));
+
+        validateProductAvailability(product);
 
         // ensure cart exists
         ensureCustomerHasCart(customer);
@@ -90,13 +136,15 @@ public class CartService {
         CartItem savedItem;
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
-            item.setQuantity(item.getQuantity() + quantity);
+            int newQuantity = ensureQuantityWithinStock(item.getQuantity() + quantity, product);
+            item.setQuantity(newQuantity);
             savedItem = cartRepo.save(item);
         } else {
+            int sanitizedQuantity = ensureQuantityWithinStock(quantity, product);
             CartItem newItem = new CartItem();
             newItem.setProduct(product);
             newItem.setCart(customer.getCart());
-            newItem.setQuantity(quantity);
+            newItem.setQuantity(sanitizedQuantity);
             savedItem = cartRepo.save(newItem);
         }
 
@@ -124,7 +172,14 @@ public class CartService {
             throw new RuntimeException("Unauthorized: cart item does not belong to this user");
         }
 
-        item.setQuantity(item.getQuantity() + 1);
+        Product product = item.getProduct();
+        if (product == null) {
+            throw new RuntimeException("Sản phẩm không tồn tại");
+        }
+
+        validateProductAvailability(product);
+        int newQuantity = ensureQuantityWithinStock(item.getQuantity() + 1, product);
+        item.setQuantity(newQuantity);
         return cartRepo.save(item);
     }
 
@@ -138,6 +193,12 @@ public class CartService {
         if (item.getCart() == null || customer.getCart() == null ||
                 !Objects.equals(item.getCart().getId(), customer.getCart().getId())) {
             throw new RuntimeException("Unauthorized: cart item does not belong to this user");
+        }
+
+        Product product = item.getProduct();
+        if (product == null || product.isHidden() || product.getStock() <= 0) {
+            cartRepo.delete(item);
+            throw new RuntimeException("Sản phẩm không còn khả dụng");
         }
 
         if (item.getQuantity() > 1) {

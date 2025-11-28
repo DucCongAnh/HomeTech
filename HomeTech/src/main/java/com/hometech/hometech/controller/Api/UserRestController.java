@@ -40,6 +40,12 @@ public class UserRestController {
         return ResponseEntity.ok(users);
     }
 
+    @GetMapping("/count")
+    public ResponseEntity<Map<String, Long>> getTotalUsers() {
+        long totalUsers = userService.countAll();
+        return ResponseEntity.ok(Map.of("totalUsers", totalUsers));
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<String> updateUserStatus(
             @PathVariable Long id,

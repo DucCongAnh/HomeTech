@@ -24,10 +24,11 @@ function Dashboard() {
       setLoading(true);
       
       // Load all data in parallel
-      const [ordersRes, productsRes, categoriesRes] = await Promise.all([
+      const [ordersRes, productsRes, categoriesRes, usersCountRes] = await Promise.all([
         adminAPI.getAllOrders().catch(() => ({ data: [] })),
         adminAPI.getAllProducts().catch(() => ({ data: [] })),
         adminAPI.getAllCategories().catch(() => ({ data: [] })),
+        adminAPI.getUsersCount().catch(() => ({ totalUsers: 0 })),
       ]);
 
       const orders = ordersRes.data || [];
@@ -41,10 +42,17 @@ function Dashboard() {
       const completedOrders = orders.filter(o => o.status === 'COMPLETED').length;
       const activeProducts = products.filter(p => !p.hidden).length;
 
+      const totalUsers = (() => {
+        if (typeof usersCountRes === 'number') return usersCountRes;
+        if (usersCountRes?.totalUsers != null) return usersCountRes.totalUsers;
+        if (usersCountRes?.data?.totalUsers != null) return usersCountRes.data.totalUsers;
+        return 0;
+      })();
+
       setStats({
         totalOrders: orders.length,
         totalProducts: products.length,
-        totalUsers: 0, // Will need API endpoint
+        totalUsers,
         totalCategories: categories.length,
         pendingOrders,
         completedOrders,

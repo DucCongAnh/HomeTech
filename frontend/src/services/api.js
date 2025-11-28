@@ -250,6 +250,11 @@ export const adminAPI = {
     return response.data;
   },
 
+  getOrdersByUser: async (userId) => {
+    const response = await api.get(`/orders/user/${userId}`);
+    return response.data;
+  },
+
   getOrderById: async (orderId) => {
     const response = await api.get(`/orders/${orderId}`);
     return response.data;
@@ -376,6 +381,11 @@ export const adminAPI = {
   // Users
   getAllUsers: async () => {
     const response = await api.get('/users/all');
+    return response.data;
+  },
+
+  getUsersCount: async () => {
+    const response = await api.get('/users/count');
     return response.data;
   },
 
