@@ -255,6 +255,16 @@ export const adminAPI = {
     return response.data;
   },
 
+  broadcastNotification: async (payload) => {
+    const response = await api.post('/admin/notifications/broadcast', payload);
+    return response.data;
+  },
+
+  broadcastMarketingEmail: async (payload) => {
+    const response = await api.post('/admin/marketing/email', payload);
+    return response.data;
+  },
+
   getOrderById: async (orderId) => {
     const response = await api.get(`/orders/${orderId}`);
     return response.data;
@@ -323,6 +333,51 @@ export const adminAPI = {
 
   deleteProductImage: async (imageId) => {
     const response = await api.delete(`/products/images/${imageId}`);
+    return response.data;
+  },
+
+  // Marketing content (banners, sliders, footer)
+  getSiteBanners: async (type = null) => {
+    const response = await api.get('/admin/content/banners', {
+      params: type ? { type } : undefined,
+    });
+    return response.data;
+  },
+
+  getBannerById: async (id) => {
+    const response = await api.get(`/admin/content/banners/${id}`);
+    return response.data;
+  },
+
+  createBanner: async (payload) => {
+    const response = await api.post('/admin/content/banners', payload);
+    return response.data;
+  },
+
+  updateBanner: async (id, payload) => {
+    const response = await api.put(`/admin/content/banners/${id}`, payload);
+    return response.data;
+  },
+
+  toggleBanner: async (id, active) => {
+    const response = await api.put(`/admin/content/banners/${id}/toggle`, null, {
+      params: typeof active === 'boolean' ? { active } : undefined,
+    });
+    return response.data;
+  },
+
+  deleteBanner: async (id) => {
+    const response = await api.delete(`/admin/content/banners/${id}`);
+    return response.data;
+  },
+
+  getFooterContent: async () => {
+    const response = await api.get('/admin/content/footer');
+    return response.data;
+  },
+
+  updateFooterContent: async (payload) => {
+    const response = await api.put('/admin/content/footer', payload);
     return response.data;
   },
 
@@ -575,6 +630,24 @@ export const userAPI = {
   // Reviews
   getProductReviews: async (productId) => {
     const response = await api.get(`/reviews/product/${productId}`);
+    return response.data;
+  },
+
+  // Marketing content
+  getHeroBanners: async () => {
+    const response = await api.get('/content/banners', {
+      params: { type: 'BANNER' }
+    });
+    return response.data;
+  },
+
+  getSliderItems: async () => {
+    const response = await api.get('/content/sliders');
+    return response.data;
+  },
+
+  getFooterContent: async () => {
+    const response = await api.get('/content/footer');
     return response.data;
   },
 

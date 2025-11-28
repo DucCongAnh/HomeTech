@@ -14,6 +14,20 @@ function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState([]);
+  const [broadcastForm, setBroadcastForm] = useState({
+    type: 'MARKETING',
+    message: '',
+  });
+  const [broadcastStatus, setBroadcastStatus] = useState(null);
+  const [broadcastError, setBroadcastError] = useState(null);
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    subject: '',
+    content: '',
+  });
+  const [emailStatus, setEmailStatus] = useState(null);
+  const [emailError, setEmailError] = useState(null);
+  const [emailSending, setEmailSending] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -105,6 +119,65 @@ function Dashboard() {
     );
   };
 
+  const handleBroadcastSubmit = async (event) => {
+    event.preventDefault();
+    setBroadcastError(null);
+    setBroadcastStatus(null);
+
+    const message = broadcastForm.message.trim();
+    if (!message) {
+      setBroadcastError('Nội dung thông báo không được để trống');
+      return;
+    }
+
+    try {
+      setBroadcastSending(true);
+      const payload = {
+        message,
+        type: broadcastForm.type,
+      };
+      const response = await adminAPI.broadcastNotification(payload);
+      const sent = response?.sent ?? response?.data?.sent ?? 0;
+      setBroadcastStatus(`Đã gửi tới ${sent} khách hàng`);
+      setBroadcastForm((prev) => ({ ...prev, message: '' }));
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'Không thể gửi thông báo';
+      setBroadcastError(errorMsg);
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
+  const handleEmailBroadcastSubmit = async (event) => {
+    event.preventDefault();
+    setEmailError(null);
+    setEmailStatus(null);
+
+    const subject = emailForm.subject.trim();
+    const content = emailForm.content.trim();
+
+    if (!subject || !content) {
+      setEmailError('Vui lòng nhập đầy đủ tiêu đề và nội dung email.');
+      return;
+    }
+
+    try {
+      setEmailSending(true);
+      const response = await adminAPI.broadcastMarketingEmail({
+        subject,
+        content,
+      });
+      const sent = response?.sent ?? response?.data?.sent ?? 0;
+      setEmailStatus(`Đã gửi email tới ${sent} khách hàng`);
+      setEmailForm({ subject: '', content: '' });
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'Không thể gửi email';
+      setEmailError(errorMsg);
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.loading}>
@@ -170,6 +243,97 @@ function Dashboard() {
             <p className={styles.statValue}>{stats.totalCategories}</p>
           </div>
         </div>
+      </div>
+
+      <div className={styles.broadcastCard}>
+        <div className={styles.broadcastHeader}>
+          <div>
+            <h2>Thông báo quảng cáo</h2>
+            <p>Gửi khuyến mãi/chiến dịch đến tất cả khách hàng</p>
+          </div>
+          {broadcastStatus && (
+            <span className={styles.broadcastSuccess}>{broadcastStatus}</span>
+          )}
+        </div>
+        <form className={styles.broadcastForm} onSubmit={handleBroadcastSubmit}>
+          <div className={styles.formGroup}>
+            <label>Loại thông báo</label>
+            <select
+              value={broadcastForm.type}
+              onChange={(e) =>
+                setBroadcastForm((prev) => ({ ...prev, type: e.target.value }))
+              }
+            >
+              <option value="MARKETING">Quảng cáo / Khuyến mãi</option>
+              <option value="ANNOUNCEMENT">Thông báo chung</option>
+            </select>
+          </div>
+          <div className={styles.formGroup}>
+            <label>Nội dung</label>
+            <textarea
+              rows={4}
+              placeholder="Ví dụ: Tuần lễ vàng giảm giá 30% cho toàn bộ sản phẩm..."
+              value={broadcastForm.message}
+              onChange={(e) =>
+                setBroadcastForm((prev) => ({ ...prev, message: e.target.value }))
+              }
+            />
+          </div>
+          {broadcastError && (
+            <p className={styles.broadcastError}>{broadcastError}</p>
+          )}
+          <button
+            type="submit"
+            className={styles.broadcastButton}
+            disabled={broadcastSending}
+          >
+            {broadcastSending ? 'Đang gửi...' : 'Gửi thông báo'}
+          </button>
+        </form>
+      </div>
+
+      <div className={styles.broadcastCard}>
+        <div className={styles.broadcastHeader}>
+          <div>
+            <h2>Email Marketing</h2>
+            <p>Gửi email Gmail đồng loạt cho khách hàng</p>
+          </div>
+          {emailStatus && (
+            <span className={styles.broadcastSuccess}>{emailStatus}</span>
+          )}
+        </div>
+        <form className={styles.broadcastForm} onSubmit={handleEmailBroadcastSubmit}>
+          <div className={styles.formGroup}>
+            <label>Tiêu đề email</label>
+            <input
+              type="text"
+              placeholder="Ví dụ: Siêu ưu đãi tháng 12 dành cho bạn!"
+              value={emailForm.subject}
+              onChange={(e) =>
+                setEmailForm((prev) => ({ ...prev, subject: e.target.value }))
+              }
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label>Nội dung email</label>
+            <textarea
+              rows={5}
+              placeholder="Mô tả chương trình, ưu đãi, đường dẫn..."
+              value={emailForm.content}
+              onChange={(e) =>
+                setEmailForm((prev) => ({ ...prev, content: e.target.value }))
+              }
+            />
+          </div>
+          {emailError && <p className={styles.broadcastError}>{emailError}</p>}
+          <button
+            type="submit"
+            className={styles.broadcastButton}
+            disabled={emailSending}
+          >
+            {emailSending ? 'Đang gửi email...' : 'Gửi email quảng cáo'}
+          </button>
+        </form>
       </div>
 
       {/* Order Status Summary */}

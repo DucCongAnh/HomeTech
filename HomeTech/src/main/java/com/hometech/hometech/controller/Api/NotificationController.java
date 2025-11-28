@@ -2,6 +2,7 @@ package com.hometech.hometech.controller.Api;
 
 import com.hometech.hometech.Repository.AccountRepository;
 import com.hometech.hometech.Repository.UserRepository;
+import com.hometech.hometech.enums.RoleType;
 import com.hometech.hometech.model.Account;
 import com.hometech.hometech.model.Notify;
 import com.hometech.hometech.model.User;
@@ -17,10 +18,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -70,10 +71,17 @@ public class NotificationController {
         public Notification() {;}
     }
 
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        System.out.println("🔍 getCurrentUserId - Authentication: " + (authentication != null ? authentication.getName() : "null"));
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BroadcastRequest {
+        private String message;
+        private String type;
+        private Long relatedId;
+    }
 
+    private Account resolveAccount(Authentication authentication) {
+        System.out.println("🔍 getCurrentAccount - Authentication: " + (authentication != null ? authentication.getName() : "null"));
         if (authentication != null && authentication.isAuthenticated()) {
             String name = authentication.getName();
             Account account = accountRepository.findByUsername(name)
@@ -91,15 +99,33 @@ public class NotificationController {
             }
             if (account == null) {
                 System.out.println("⚠️ Account not found for: " + name);
-                return null;
             }
-            User user = userRepository.findByAccount(account);
-            Long userId = user != null ? user.getId() : null;
-            System.out.println("✅ Current user ID: " + userId);
-            return userId;
+            return account;
         }
         System.out.println("⚠️ User not authenticated");
         return null;
+    }
+
+    private Account getCurrentAccount() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return resolveAccount(authentication);
+    }
+
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Account account = resolveAccount(authentication);
+        if (account == null) {
+            return null;
+        }
+        User user = userRepository.findByAccount(account);
+        Long userId = user != null ? user.getId() : null;
+        System.out.println("✅ Current user ID: " + userId);
+        return userId;
+    }
+
+    private boolean isCurrentUserAdmin() {
+        Account account = getCurrentAccount();
+        return account != null && RoleType.ADMIN.equals(account.getRole());
     }
 
     // STOMP entrypoint for app messages
@@ -121,6 +147,31 @@ public class NotificationController {
         notification.setTimestamp(LocalDateTime.now().toString());
         System.out.println("🔔 Sending test notification: " + notification.getMessage());
         messagingTemplate.convertAndSend("/topic/notifications", notification);
+    }
+
+    @PostMapping("/api/admin/notifications/broadcast")
+    public ResponseEntity<Map<String, Object>> broadcastMarketing(@RequestBody BroadcastRequest request) {
+        if (!isCurrentUserAdmin()) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "success", false,
+                    "message", "Bạn không có quyền gửi thông báo này"
+            ));
+        }
+
+        if (request == null || !StringUtils.hasText(request.getMessage())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Nội dung thông báo không được để trống"
+            ));
+        }
+
+        String type = StringUtils.hasText(request.getType()) ? request.getType().trim() : "MARKETING";
+        long sent = notifyService.broadcastToCustomers(request.getMessage().trim(), type, request.getRelatedId());
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "sent", sent
+        ));
     }
 
     // GET endpoint for easy testing

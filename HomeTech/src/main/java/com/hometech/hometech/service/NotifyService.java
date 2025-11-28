@@ -3,6 +3,7 @@ package com.hometech.hometech.service;
 import com.hometech.hometech.Repository.AdminRepository;
 import com.hometech.hometech.Repository.NotifyRepository;
 import com.hometech.hometech.Repository.UserRepository;
+import com.hometech.hometech.enums.RoleType;
 import com.hometech.hometech.model.Admin;
 import com.hometech.hometech.model.Notify;
 import com.hometech.hometech.model.User;
@@ -76,6 +77,33 @@ public class NotifyService {
         } catch (Exception e) {
             System.err.println("❌ Failed to broadcast admin notification: " + e.getMessage());
         }
+    }
+
+    /**
+     * Broadcast marketing/announcement notification to all active customers
+     *
+     * @return number of users received the notification
+     */
+    @Transactional
+    public long broadcastToCustomers(String message, String type, Long relatedId) {
+        List<User> users = userRepository.findAll();
+        long sentCount = 0;
+
+        for (User user : users) {
+            if (user == null || user.getAccount() == null) continue;
+            boolean isCustomer = RoleType.USER.equals(user.getAccount().getRole());
+            boolean isEnabled = user.getAccount().isEnabled();
+            if (!isCustomer || !isEnabled) continue;
+
+            try {
+                createNotification(user.getId(), message, type, relatedId);
+                sentCount++;
+            } catch (Exception ex) {
+                System.err.println("❌ Failed to notify user #" + user.getId() + ": " + ex.getMessage());
+            }
+        }
+
+        return sentCount;
     }
 
     /**

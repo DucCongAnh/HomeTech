@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { userAPI, authAPI } from '../services/api';
 import api from '../services/api';
@@ -20,10 +20,23 @@ function Home() {
   const [allProducts, setAllProducts] = useState([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [sortOption, setSortOption] = useState('default'); // default, priceAsc, priceDesc, soldAsc, soldDesc
+  const [heroBanners, setHeroBanners] = useState([]);
+  const [sliderItems, setSliderItems] = useState([]);
+  const [footerContent, setFooterContent] = useState(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const sliderTrackRef = useRef(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!heroBanners.length) return undefined;
+    const intervalId = setInterval(() => {
+      setActiveBannerIndex((prev) => (prev + 1) % heroBanners.length);
+    }, 6000);
+    return () => clearInterval(intervalId);
+  }, [heroBanners]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -64,11 +77,22 @@ function Home() {
 
       // Load user info, products, categories, top selling in parallel
       const token = localStorage.getItem('accessToken');
-      const [userRes, productsRes, categoriesRes, topSellingRes] = await Promise.all([
+      const [
+        userRes,
+        productsRes,
+        categoriesRes,
+        topSellingRes,
+        heroRes,
+        sliderRes,
+        footerRes
+      ] = await Promise.all([
         token ? api.get('/auth/user-info').catch(() => ({ data: { success: false } })) : Promise.resolve({ data: { success: false } }),
         userAPI.getAllProducts().catch(() => ({ data: [] })),
         userAPI.getAllCategories().catch(() => ({ data: [] })),
-        userAPI.getTopSelling().catch(() => ({ data: [] }))
+        userAPI.getTopSelling().catch(() => ({ data: [] })),
+        userAPI.getHeroBanners().catch(() => ({ data: [] })),
+        userAPI.getSliderItems().catch(() => ({ data: [] })),
+        userAPI.getFooterContent().catch(() => ({ data: null }))
       ]);
 
       if (userRes.data.success) {
@@ -85,6 +109,10 @@ function Home() {
 
       setCategories(categoriesRes.data || []);
       setTopSelling(topSellingRes.data || []);
+      setHeroBanners(heroRes.data || []);
+      setSliderItems(sliderRes.data || []);
+      setFooterContent(footerRes.data || null);
+      setActiveBannerIndex(0);
 
       // Load images for all products
       const imagePromises = activeProducts.map(async (product) => {
@@ -175,6 +203,39 @@ function Home() {
       localStorage.clear();
       navigate('/login');
     }
+  };
+
+  const renderBannerAction = (item, className) => {
+    if (!item?.redirectUrl) return null;
+    const label = item.buttonText?.trim() || 'Khám phá ngay';
+    if (item.redirectUrl.startsWith('/')) {
+      return (
+        <Link to={item.redirectUrl} className={className}>
+          {label}
+        </Link>
+      );
+    }
+    return (
+      <a href={item.redirectUrl} target="_blank" rel="noopener noreferrer" className={className}>
+        {label}
+      </a>
+    );
+  };
+
+  const handleHeroNavigation = (direction) => {
+    if (!heroBanners.length) return;
+    setActiveBannerIndex((prev) => {
+      if (direction === 'next') {
+        return (prev + 1) % heroBanners.length;
+      }
+      return (prev - 1 + heroBanners.length) % heroBanners.length;
+    });
+  };
+
+  const scrollSlider = (direction) => {
+    if (!sliderTrackRef.current) return;
+    const distance = direction === 'next' ? 320 : -320;
+    sliderTrackRef.current.scrollBy({ left: distance, behavior: 'smooth' });
   };
 
   const performSearch = async (keyword) => {
@@ -558,12 +619,90 @@ function Home() {
         </nav>
       )}
 
-      {/* Banner */}
+      {/* Banner & Hero Slider */}
       {!searchKeyword.trim() && (
-        <section className={styles.banner}>
-          <div className={styles.bannerContent}>
-            <h1 className={styles.bannerTitle}>Chào mừng đến với HomeTech</h1>
-            <p className={styles.bannerSubtitle}>Thiết bị gia đình thông minh - Chất lượng hàng đầu</p>
+        heroBanners.length > 0 ? (
+          <section className={styles.heroCarousel}>
+            <button
+              className={`${styles.heroNav} ${styles.heroNavPrev}`}
+              onClick={() => handleHeroNavigation('prev')}
+              aria-label="Banner trước"
+            >
+              ‹
+            </button>
+            <div
+              className={styles.heroSlides}
+              style={{ transform: `translateX(-${activeBannerIndex * 100}%)` }}
+            >
+              {heroBanners.map((banner, index) => (
+                <div
+                  key={banner.id || index}
+                  className={`${styles.heroSlide} ${index === activeBannerIndex ? styles.heroSlideActive : ''}`}
+                  style={{ backgroundImage: `url(${banner.imageUrl})` }}
+                >
+                  <div className={styles.heroOverlay}>
+                    {banner.subtitle && <p className={styles.heroSubtitle}>{banner.subtitle}</p>}
+                    <h1 className={styles.heroTitle}>{banner.title}</h1>
+                    <div className={styles.heroActions}>
+                      {renderBannerAction(banner, styles.heroButton)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              className={`${styles.heroNav} ${styles.heroNavNext}`}
+              onClick={() => handleHeroNavigation('next')}
+              aria-label="Banner tiếp theo"
+            >
+              ›
+            </button>
+            <div className={styles.heroDots}>
+              {heroBanners.map((banner, index) => (
+                <button
+                  key={banner.id || `dot-${index}`}
+                  className={`${styles.heroDot} ${index === activeBannerIndex ? styles.heroDotActive : ''}`}
+                  onClick={() => setActiveBannerIndex(index)}
+                  aria-label={`Chuyển đến banner ${index + 1}`}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className={styles.banner}>
+            <div className={styles.bannerContent}>
+              <h1 className={styles.bannerTitle}>Chào mừng đến với HomeTech</h1>
+              <p className={styles.bannerSubtitle}>Thiết bị gia đình thông minh - Chất lượng hàng đầu</p>
+            </div>
+          </section>
+        )
+      )}
+
+      {/* Slider Section */}
+      {!searchKeyword.trim() && sliderItems.length > 0 && (
+        <section className={styles.sliderSection}>
+          <div className={styles.sliderHeader}>
+            <h2 className={styles.sectionTitle}>Ưu đãi & Slider</h2>
+            <div className={styles.sliderControls}>
+              <button className={styles.sliderButton} onClick={() => scrollSlider('prev')} aria-label="Slider trước">
+                ‹
+              </button>
+              <button className={styles.sliderButton} onClick={() => scrollSlider('next')} aria-label="Slider tiếp theo">
+                ›
+              </button>
+            </div>
+          </div>
+          <div className={styles.sliderTrack} ref={sliderTrackRef}>
+            {sliderItems.map((item) => (
+              <div key={item.id} className={styles.sliderCard}>
+                <div className={styles.sliderImage} style={{ backgroundImage: `url(${item.imageUrl})` }} />
+                <div className={styles.sliderBody}>
+                  <h3 className={styles.sliderTitle}>{item.title}</h3>
+                  {item.subtitle && <p className={styles.sliderDescription}>{item.subtitle}</p>}
+                  {renderBannerAction(item, styles.sliderLink)}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -713,6 +852,57 @@ function Home() {
           </div>
         )}
       </section>
+      {footerContent && (
+        <footer className={styles.footer}>
+          <div className={styles.footerGrid}>
+            <div className={`${styles.footerColumn} ${styles.footerBrand}`}>
+              <h3>HomeTech</h3>
+              <p>{footerContent.about}</p>
+              <div className={styles.footerSocials}>
+                {footerContent.facebookUrl && (
+                  <a href={footerContent.facebookUrl} target="_blank" rel="noopener noreferrer" className={styles.footerSocialLink}>
+                    Facebook
+                  </a>
+                )}
+                {footerContent.instagramUrl && (
+                  <a href={footerContent.instagramUrl} target="_blank" rel="noopener noreferrer" className={styles.footerSocialLink}>
+                    Instagram
+                  </a>
+                )}
+                {footerContent.youtubeUrl && (
+                  <a href={footerContent.youtubeUrl} target="_blank" rel="noopener noreferrer" className={styles.footerSocialLink}>
+                    YouTube
+                  </a>
+                )}
+                {footerContent.tiktokUrl && (
+                  <a href={footerContent.tiktokUrl} target="_blank" rel="noopener noreferrer" className={styles.footerSocialLink}>
+                    TikTok
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className={styles.footerColumn}>
+              <h4>Liên hệ</h4>
+              <ul className={styles.footerContact}>
+                {footerContent.hotline && <li>Hotline: <a href={`tel:${footerContent.hotline}`}>{footerContent.hotline}</a></li>}
+                {footerContent.email && <li>Email: <a href={`mailto:${footerContent.email}`}>{footerContent.email}</a></li>}
+                {footerContent.address && <li>Địa chỉ: {footerContent.address}</li>}
+              </ul>
+            </div>
+            <div className={styles.footerColumn}>
+              <h4>Hỗ trợ</h4>
+              <ul className={styles.footerContact}>
+                <li>Thời gian: {footerContent.supportHours}</li>
+                <li><Link to="/orders">Theo dõi đơn hàng</Link></li>
+                <li><Link to="/favorites">Danh sách yêu thích</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className={styles.footerBottom}>
+            <p>© {new Date().getFullYear()} HomeTech. All rights reserved.</p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

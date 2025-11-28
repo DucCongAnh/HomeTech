@@ -19,7 +19,7 @@ public class EmailService {
 
     public void sendVerificationEmail(String toEmail, String verificationToken) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
         helper.setFrom(fromEmail);
         helper.setTo(toEmail);
@@ -55,7 +55,7 @@ public class EmailService {
 
     public void sendPasswordResetEmail(String toEmail, String resetToken) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
         helper.setFrom(fromEmail);
         helper.setTo(toEmail);
@@ -88,6 +88,18 @@ public class EmailService {
             """.formatted(resetLink);
 
         helper.setText(htmlContent, true);
+        mailSender.send(message);
+    }
+
+    public void sendMarketingEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        helper.setFrom(fromEmail);
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
         mailSender.send(message);
     }
 }
