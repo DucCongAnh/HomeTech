@@ -20,14 +20,14 @@ public class Customer extends User {
     @JsonIgnore
     private List<Address> addresses = new ArrayList<>();
 
-    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "customer", fetch = FetchType.LAZY)
     @JsonIgnore
     private Cart cart;
 
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
     private List<Order> orders;
 
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
 
     private List<Review> reviews;
 

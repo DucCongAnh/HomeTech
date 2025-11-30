@@ -104,6 +104,12 @@ public class OrderService {
 
             product.setStock(product.getStock() - c.getQuantity());
             product.setSoldCount(product.getSoldCount() + c.getQuantity());
+            
+            // Tự động ẩn sản phẩm khi tồn kho = 0
+            if (product.getStock() <= 0) {
+                product.setHidden(true);
+            }
+            
             productsToUpdate.add(product);
         }
 
@@ -372,6 +378,9 @@ public class OrderService {
             throw new RuntimeException("Không thể hủy đơn hàng. Chỉ có thể hủy trong 30 phút đầu và trạng thái chờ xác nhận.");
         }
 
+        // Hoàn trả tồn kho trước khi hủy đơn
+        restoreStockFromCancelledOrder(order);
+
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepo.save(order);
 
@@ -396,6 +405,9 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.COMPLETED) {
             throw new RuntimeException("Không thể hủy đơn hàng đã hoàn thành");
         }
+
+        // Hoàn trả tồn kho trước khi hủy đơn
+        restoreStockFromCancelledOrder(order);
 
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepo.save(order);
@@ -524,5 +536,48 @@ public class OrderService {
             return null;
         }
         return customer.getAccount().getEmail();
+    }
+
+    /**
+     * Hoàn trả tồn kho khi đơn hàng bị hủy
+     * Chỉ hoàn trả nếu đơn hàng chưa bị hủy trước đó (tránh hoàn trả 2 lần)
+     */
+    private void restoreStockFromCancelledOrder(Order order) {
+        if (order == null) return;
+        
+        // Chỉ hoàn trả nếu đơn hàng chưa bị hủy (tránh hoàn trả 2 lần)
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return;
+        }
+
+        // Lấy danh sách OrderItem từ đơn hàng
+        List<OrderItem> orderItems = order.getItems();
+        if (orderItems == null || orderItems.isEmpty()) {
+            return;
+        }
+
+        List<Product> productsToUpdate = new ArrayList<>();
+
+        for (OrderItem item : orderItems) {
+            Product product = item.getProduct();
+            if (product == null) continue;
+
+            // Hoàn trả số lượng đã trừ
+            int quantityToRestore = item.getQuantity();
+            product.setStock(product.getStock() + quantityToRestore);
+            
+            // Nếu tồn kho > 0 sau khi hoàn trả, tự động hiện lại sản phẩm
+            // (nếu trước đó bị ẩn do hết hàng)
+            if (product.getStock() > 0 && product.isHidden()) {
+                product.setHidden(false);
+            }
+            
+            productsToUpdate.add(product);
+        }
+
+        // Lưu các sản phẩm đã cập nhật
+        if (!productsToUpdate.isEmpty()) {
+            productRepository.saveAll(productsToUpdate);
+        }
     }
 }

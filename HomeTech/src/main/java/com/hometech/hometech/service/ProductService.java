@@ -21,7 +21,23 @@ public class ProductService {
         this.categoryRepository = categoryRepository;
     }
     public Product save(Product product) {
+        // Tự động ẩn sản phẩm khi tồn kho = 0
+        updateHiddenBasedOnStock(product);
         return productRepository.save(product);
+    }
+
+    /**
+     * Tự động ẩn sản phẩm khi tồn kho = 0
+     * Nếu tồn kho > 0, giữ nguyên trạng thái hidden hiện tại (không tự động hiện lại)
+     */
+    private void updateHiddenBasedOnStock(Product product) {
+        if (product == null) return;
+        
+        if (product.getStock() <= 0) {
+            // Tự động ẩn khi hết hàng
+            product.setHidden(true);
+        }
+        // Nếu stock > 0, giữ nguyên hidden (admin có thể ẩn/hiện thủ công)
     }
     // 🟢 Lấy toàn bộ sản phẩm (bao gồm cả hidden - chỉ dùng cho admin)
     public List<Product> getAll() {
