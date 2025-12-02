@@ -47,10 +47,12 @@ public class OrderRestController {
     @GetMapping("/preview")
     public ResponseEntity<?> previewOrder(
             @RequestParam Long userId,
-            @RequestParam(required = false) String voucherCode
+            @RequestParam(required = false) String voucherCode,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Integer quantity
     ) {
         try {
-            PreviewOrderResponse preview = orderService.previewOrder(userId, voucherCode);
+            PreviewOrderResponse preview = orderService.previewOrder(userId, voucherCode, productId, quantity);
             return ResponseEntity.ok(preview);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -60,10 +62,12 @@ public class OrderRestController {
     public ResponseEntity<Map<String, Object>> createOrder(
             @PathVariable Long userId,
             @RequestParam(required = false) String voucherCode,
-            @RequestParam(required = false) PaymentMethod paymentMethod
+            @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Integer quantity
     ) {
         try {
-            Order order = orderService.createOrder(userId, voucherCode, paymentMethod);
+            Order order = orderService.createOrder(userId, voucherCode, paymentMethod, productId, quantity);
             return buildResponse(true, "Đơn hàng được tạo thành công", order, null, HttpStatus.OK);
         } catch (RuntimeException e) {
             return buildResponse(false, "Tạo đơn hàng thất bại", null, e.getMessage(), HttpStatus.BAD_REQUEST);

@@ -181,6 +181,27 @@ function ProductDetail() {
     }
   };
 
+  const handleBuyNow = () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token || !userInfo) {
+      alert('Vui lòng đăng nhập để mua hàng');
+      navigate('/login');
+      return;
+    }
+
+    if (product.stock <= 0) {
+      alert('Sản phẩm đã hết hàng');
+      return;
+    }
+
+    if (quantity < 1 || quantity > product.stock) {
+      alert(`Số lượng không hợp lệ. Vui lòng chọn từ 1 đến ${product.stock} sản phẩm.`);
+      return;
+    }
+
+    navigate(`/checkout?buyNow=1&productId=${product.id}&quantity=${quantity}`);
+  };
+
   const handleToggleFavorite = async () => {
     if (!userInfo) {
       alert('Vui lòng đăng nhập để sử dụng danh sách yêu thích');
@@ -504,6 +525,7 @@ function ProductDetail() {
             </button>
             <button
               className={styles.buyNowButton}
+              onClick={handleBuyNow}
               disabled={!userInfo || product.stock <= 0}
             >
               Mua ngay

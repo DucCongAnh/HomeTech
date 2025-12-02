@@ -21,6 +21,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/**",
                         "/api/products/**",// 🔥 Phải có dòng này
                         "/oauth2/**",
+                        "/payment/**",
                         "/css/**", "/js/**", "/images/**"
                 );
     }

@@ -218,22 +218,33 @@ export const adminAPI = {
   },
 
   // Preview đơn hàng trước khi đặt
-  previewOrder: async (userId, voucherCode = null) => {
+  previewOrder: async (userId, voucherCode = null, productId = null, quantity = null) => {
+    const params = { userId };
+    if (voucherCode) params.voucherCode = voucherCode;
+    if (productId) params.productId = productId;
+    if (Number.isInteger(quantity)) params.quantity = quantity;
+
     const response = await api.get('/orders/preview', {
-      params: { userId, voucherCode }
+      params
     });
     return response.data;
   },
 
   // Tạo đơn hàng
   createOrder: async (userId, options = {}) => {
-    const { voucherCode, paymentMethod } = options;
+    const { voucherCode, paymentMethod, productId, quantity } = options;
     const params = {};
     if (voucherCode) {
       params.voucherCode = voucherCode;
     }
     if (paymentMethod) {
       params.paymentMethod = paymentMethod;
+    }
+    if (productId) {
+      params.productId = productId;
+    }
+    if (Number.isInteger(quantity)) {
+      params.quantity = quantity;
     }
     const response = await api.post(`/orders/create/${userId}`, null, {
       params
@@ -558,10 +569,12 @@ export const userAPI = {
     return response.data;
   },
   createOrder: async (userId, options = {}) => {
-    const { voucherCode, paymentMethod } = options;
+    const { voucherCode, paymentMethod, productId, quantity } = options;
     const params = {};
     if (voucherCode) params.voucherCode = voucherCode;
     if (paymentMethod) params.paymentMethod = paymentMethod;
+    if (productId) params.productId = productId;
+    if (Number.isInteger(quantity)) params.quantity = quantity;
     const response = await api.post(`/orders/create/${userId}`, null, {
       params
     });
@@ -687,9 +700,13 @@ export const userAPI = {
     return response.data;
   },
 
-  previewOrder: async (userId, voucherCode = null) => {
+  previewOrder: async (userId, voucherCode = null, productId = null, quantity = null) => {
+    const params = { userId };
+    if (voucherCode) params.voucherCode = voucherCode;
+    if (productId) params.productId = productId;
+    if (Number.isInteger(quantity)) params.quantity = quantity;
     const response = await api.get('/orders/preview', {
-      params: { userId, voucherCode },
+      params,
     });
     return response.data;
   },
@@ -762,6 +779,41 @@ export const notificationAPI = {
   },
   delete: async (notificationId) => {
     const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+};
+
+export const chatAPI = {
+  getMyConversation: async () => {
+    const response = await api.get('/chat/conversations/me');
+    return response.data;
+  },
+  getConversationMessages: async (conversationId) => {
+    const response = await api.get(`/chat/conversations/${conversationId}/messages`);
+    return response.data;
+  },
+  getAdminConversations: async () => {
+    const response = await api.get('/chat/conversations/admin');
+    return response.data;
+  },
+  sendMessage: async (conversationId, content) => {
+    const response = await api.post('/chat/messages', {
+      conversationId,
+      content,
+    });
+    return response.data;
+  },
+  getUnreadCount: async () => {
+    const response = await api.get('/chat/unread-count');
+    return response.data;
+  },
+  markAsReadForCustomer: async () => {
+    const response = await api.post('/chat/mark-read');
+    return response.data;
+  },
+  getOrCreateAdminConversationForUser: async (userId) => {
+    // Backend mapping: @GetMapping("/admin/customer/{userId}/conversation") under @RequestMapping("/api/chat")
+    const response = await api.get(`/chat/admin/customer/${userId}/conversation`);
     return response.data;
   },
 };

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styles from './Checkout.module.css';
 import api, { userAPI, paymentAPI } from '../services/api';
 
@@ -35,6 +35,7 @@ const formatCurrency = (value) =>
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userInfo, setUserInfo] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,16 +46,41 @@ export default function Checkout() {
   const [voucherPreview, setVoucherPreview] = useState(null);
   const [voucherFeedback, setVoucherFeedback] = useState('');
   const [voucherError, setVoucherError] = useState('');
+  const buyNowContext = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const isBuyNow = searchParams.get('buyNow') === '1';
+    const productIdParam = searchParams.get('productId');
+    const quantityParam = parseInt(searchParams.get('quantity'), 10);
+    const safeQuantity = Number.isFinite(quantityParam) && quantityParam > 0 ? quantityParam : 1;
+
+    if (isBuyNow && productIdParam) {
+      const parsedId = Number(productIdParam);
+      return {
+        isBuyNow: true,
+        productId: Number.isNaN(parsedId) ? null : parsedId,
+        quantity: safeQuantity,
+      };
+    }
+
+    return { isBuyNow: false, productId: null, quantity: 0 };
+  }, [location.search]);
+  const isBuyNowMode = Boolean(buyNowContext.isBuyNow && buyNowContext.productId);
 
   useEffect(() => {
     loadUserInfo();
   }, []);
 
   useEffect(() => {
-    if (userInfo?.id) {
+    if (!userInfo?.id) {
+      return;
+    }
+
+    if (isBuyNowMode) {
+      loadBuyNowItem(buyNowContext.productId, buyNowContext.quantity);
+    } else {
       loadCart(userInfo.id);
     }
-  }, [userInfo]);
+  }, [userInfo, isBuyNowMode, buyNowContext.productId, buyNowContext.quantity]);
 
   const loadUserInfo = async () => {
     try {
@@ -75,11 +101,55 @@ export default function Checkout() {
     }
   };
 
+  const loadBuyNowItem = async (productId, quantity) => {
+    if (!productId) {
+      navigate('/cart');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await userAPI.getProductById(productId);
+      const productData = response.data;
+
+      if (!productData || productData.stock <= 0) {
+        alert('Sản phẩm hiện không khả dụng. Vui lòng chọn sản phẩm khác.');
+        navigate(`/product/${productId}`);
+        return;
+      }
+
+      const safeQuantity = Math.min(Math.max(quantity, 1), productData.stock);
+      if (safeQuantity !== quantity) {
+        alert(`Số lượng được điều chỉnh thành ${safeQuantity} do tồn kho hạn chế.`);
+      }
+
+      setCartItems([
+        {
+          id: `buy-now-${productId}`,
+          product: productData,
+          quantity: safeQuantity,
+        },
+      ]);
+      setVoucherPreview(null);
+      setVoucherFeedback('');
+      setVoucherError('');
+    } catch (error) {
+      console.error('loadBuyNowItem error:', error);
+      alert(error?.response?.data?.message || 'Không thể tải thông tin sản phẩm.');
+      navigate(`/product/${productId}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadCart = async (userId) => {
     try {
       setLoading(true);
       const response = await userAPI.getCart(userId);
       setCartItems(response.data || []);
+      setVoucherPreview(null);
+      setVoucherFeedback('');
+      setVoucherError('');
     } catch (error) {
       console.error('loadCart error:', error);
     } finally {
@@ -123,16 +193,26 @@ export default function Checkout() {
       navigate('/login');
       return;
     }
-    if (cartItems.length === 0) {
-      alert('Giỏ hàng của bạn đang trống.');
+    if (!isBuyNowMode && cartItems.length === 0) {
+      alert('Không có sản phẩm để thanh toán.');
       return;
     }
     try {
       setPlacingOrder(true);
-      const response = await userAPI.createOrder(userInfo.id, {
+      const activeQuantity = isBuyNowMode
+        ? cartItems[0]?.quantity || buyNowContext.quantity
+        : null;
+      const orderOptions = {
         voucherCode: voucherCode.trim() || undefined,
         paymentMethod,
-      });
+      };
+
+      if (isBuyNowMode) {
+        orderOptions.productId = buyNowContext.productId;
+        orderOptions.quantity = activeQuantity;
+      }
+
+      const response = await userAPI.createOrder(userInfo.id, orderOptions);
       if (response?.success === false) {
         throw new Error(response?.error || response?.message || 'Không thể tạo đơn hàng');
       }
@@ -171,9 +251,14 @@ export default function Checkout() {
     try {
       setApplyingVoucher(true);
       const trimmedCode = voucherCode.trim();
+      const activeQuantity = isBuyNowMode
+        ? cartItems[0]?.quantity || buyNowContext.quantity
+        : null;
       const response = await userAPI.previewOrder(
         userInfo.id,
-        trimmedCode.length ? trimmedCode : null
+        trimmedCode.length ? trimmedCode : null,
+        isBuyNowMode ? buyNowContext.productId : null,
+        isBuyNowMode ? activeQuantity : null
       );
       setVoucherPreview(response);
       setVoucherFeedback(response?.message || 'Áp dụng voucher thành công');
@@ -238,7 +323,11 @@ export default function Checkout() {
           <section className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Sản phẩm</h2>
-              <Link to="/cart">Chỉnh sửa giỏ hàng</Link>
+              {isBuyNowMode ? (
+                <Link to={`/product/${buyNowContext.productId}`}>Quay lại sản phẩm</Link>
+              ) : (
+                <Link to="/cart">Chỉnh sửa giỏ hàng</Link>
+              )}
             </div>
             <div className={styles.itemsList}>
               {cartItems.length === 0 && (

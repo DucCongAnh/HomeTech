@@ -50,7 +50,7 @@ public class OrderService {
     }
 
     // 🟢 Tạo đơn hàng từ giỏ hàng của user cụ thể
-    public Order createOrder(Long userId, String code, PaymentMethod paymentMethod) {
+    public Order createOrder(Long userId, String code, PaymentMethod paymentMethod, Long productId, Integer quantity) {
         // (1) Customer
         Customer customer = customerRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
@@ -70,13 +70,20 @@ public class OrderService {
         orderInfo.setDistrict(address.getDistrict());
         orderInfo.setCity(address.getCity());
 
-        // (3) Cart
-        if (customer.getCart() == null)
-            throw new RuntimeException("Customer cart not found");
+        boolean isBuyNow = productId != null;
 
-        List<CartItem> cartItems = cartRepo.findByCart(customer.getCart());
-        if (cartItems.isEmpty())
-            throw new RuntimeException("Giỏ hàng trống!");
+        // (3) Cart / Buy Now source
+        List<CartItem> cartItems = new ArrayList<>();
+        if (!isBuyNow) {
+            if (customer.getCart() == null) {
+                throw new RuntimeException("Customer cart not found");
+            }
+
+            cartItems = cartRepo.findByCart(customer.getCart());
+            if (cartItems.isEmpty()) {
+                throw new RuntimeException("Giỏ hàng trống!");
+            }
+        }
 
         // (4) Tính tổng
         double subtotal = 0;
@@ -84,33 +91,66 @@ public class OrderService {
 
         List<Product> productsToUpdate = new ArrayList<>();
 
-        for (CartItem c : cartItems) {
-            Product product = productRepository.findById(c.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("Sản phẩm trong giỏ không còn tồn tại."));
+        if (isBuyNow) {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại."));
 
-            if (product.getStock() < c.getQuantity()) {
+            int purchaseQuantity = (quantity != null && quantity > 0) ? quantity : 1;
+            if (purchaseQuantity <= 0) {
+                throw new RuntimeException("Số lượng sản phẩm phải lớn hơn 0");
+            }
+
+            if (product.getStock() < purchaseQuantity) {
                 throw new RuntimeException(String.format("Sản phẩm %s chỉ còn %d sản phẩm trong kho.",
                         product.getName(), product.getStock()));
             }
 
-            double itemTotal = product.getPrice() * c.getQuantity();
+            double itemTotal = product.getPrice() * purchaseQuantity;
             subtotal += itemTotal;
 
             OrderItem oi = new OrderItem();
             oi.setProduct(product);
-            oi.setQuantity(c.getQuantity());
+            oi.setQuantity(purchaseQuantity);
             oi.setPrice(product.getPrice());
             orderItems.add(oi);
 
-            product.setStock(product.getStock() - c.getQuantity());
-            product.setSoldCount(product.getSoldCount() + c.getQuantity());
-            
-            // Tự động ẩn sản phẩm khi tồn kho = 0
+            product.setStock(product.getStock() - purchaseQuantity);
+            product.setSoldCount(product.getSoldCount() + purchaseQuantity);
+
             if (product.getStock() <= 0) {
                 product.setHidden(true);
             }
-            
+
             productsToUpdate.add(product);
+        } else {
+            for (CartItem c : cartItems) {
+                Product product = productRepository.findById(c.getProduct().getId())
+                        .orElseThrow(() -> new RuntimeException("Sản phẩm trong giỏ không còn tồn tại."));
+
+                if (product.getStock() < c.getQuantity()) {
+                    throw new RuntimeException(String.format("Sản phẩm %s chỉ còn %d sản phẩm trong kho.",
+                            product.getName(), product.getStock()));
+                }
+
+                double itemTotal = product.getPrice() * c.getQuantity();
+                subtotal += itemTotal;
+
+                OrderItem oi = new OrderItem();
+                oi.setProduct(product);
+                oi.setQuantity(c.getQuantity());
+                oi.setPrice(product.getPrice());
+                orderItems.add(oi);
+
+                product.setStock(product.getStock() - c.getQuantity());
+                product.setSoldCount(product.getSoldCount() + c.getQuantity());
+                
+                // Tự động ẩn sản phẩm khi tồn kho = 0
+                if (product.getStock() <= 0) {
+                    product.setHidden(true);
+                }
+                
+                productsToUpdate.add(product);
+            }
         }
 
         // (5) Áp dụng voucher nếu có
@@ -206,24 +246,47 @@ public class OrderService {
             System.err.println("❌ Failed to send order creation notification: " + e.getMessage());
         }
 
-        // (8) Xóa cart sau khi tạo đơn
-        cartRepo.deleteAll(cartItems);
+        // (8) Xóa cart sau khi tạo đơn (chỉ áp dụng cho đặt hàng từ giỏ)
+        if (!isBuyNow && !cartItems.isEmpty()) {
+            cartRepo.deleteAll(cartItems);
+        }
 
         return order;
     }
 
-    public PreviewOrderResponse previewOrder(Long userId, String voucherCode) {
+    public PreviewOrderResponse previewOrder(Long userId, String voucherCode, Long productId, Integer quantity) {
         Customer customer = customerRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
-        List<CartItem> cartItems = cartRepo.findByCart(customer.getCart());
-        if (cartItems.isEmpty()) {
-            throw new RuntimeException("Giỏ hàng trống");
-        }
+        boolean isBuyNow = productId != null;
 
-        double subtotal = cartItems.stream()
-                .mapToDouble(c -> c.getProduct().getPrice() * c.getQuantity())
-                .sum();
+        double subtotal;
+
+        if (isBuyNow) {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại"));
+
+            int purchaseQuantity = (quantity != null && quantity > 0) ? quantity : 1;
+            if (purchaseQuantity <= 0) {
+                throw new RuntimeException("Số lượng sản phẩm phải lớn hơn 0");
+            }
+
+            if (product.getStock() < purchaseQuantity) {
+                throw new RuntimeException(String.format("Sản phẩm %s chỉ còn %d sản phẩm trong kho.",
+                        product.getName(), product.getStock()));
+            }
+
+            subtotal = product.getPrice() * purchaseQuantity;
+        } else {
+            List<CartItem> cartItems = cartRepo.findByCart(customer.getCart());
+            if (cartItems.isEmpty()) {
+                throw new RuntimeException("Giỏ hàng trống");
+            }
+
+            subtotal = cartItems.stream()
+                    .mapToDouble(c -> c.getProduct().getPrice() * c.getQuantity())
+                    .sum();
+        }
 
         double discount = 0;
         boolean voucherValid = false;

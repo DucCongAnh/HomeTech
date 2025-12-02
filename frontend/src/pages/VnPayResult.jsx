@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styles from './VnPayResult.module.css';
 
@@ -15,6 +16,13 @@ export default function VnPayResult() {
   const orderId = query.get('orderId');
   const responseCode = query.get('responseCode');
   const txnRef = query.get('txnRef');
+  const redirect = query.get('redirect');
+
+  useEffect(() => {
+    if (isSuccess && redirect === 'orders') {
+      navigate('/orders', { replace: true });
+    }
+  }, [isSuccess, redirect, navigate]);
 
   const handleViewOrders = () => {
     navigate('/orders');

@@ -146,6 +146,25 @@
   flex-wrap: wrap;
 }
 
+.chatButton {
+  padding: 0.5rem;
+  border-radius: 999px;
+  border: none;
+  background: #111827;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.3);
+}
+
+.chatButton:hover {
+  background: #0f172a;
+  transform: translateY(-1px);
+}
+
 .statusBadge {
   padding: 0.25rem 0.75rem;
   border-radius: 999px;

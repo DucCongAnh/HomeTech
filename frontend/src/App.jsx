@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -16,12 +16,16 @@ import Orders from './pages/Orders';
 import Favorites from './pages/Favorites';
 import ExpenseManagement from './pages/ExpenseManagement';
 import NotificationBell from './components/NotificationBell';
+import ChatWidget from './components/ChatWidget';
 import VnPayResult from './pages/VnPayResult';
 import './App.css';
 
-function App() {
+function AppRoutes() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.toLowerCase().startsWith('/admin');
+
   return (
-    <Router>
+    <>
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
@@ -56,6 +60,15 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <NotificationBell />
+      {!isAdminRoute && <ChatWidget />}
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppRoutes />
     </Router>
   );
 }

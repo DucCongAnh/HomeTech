@@ -121,10 +121,8 @@ public class VnPayController {
         Long orderId = payment != null && payment.getOrder() != null ? payment.getOrder().getId() : null;
         Double amount = payment != null ? payment.getAmount() : null;
 
-        String targetPath = success ? "/cart" : "/payment/vnpay/result";
-
         UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl(frontendBaseUrl + targetPath)
+                .fromHttpUrl(frontendBaseUrl + "/payment/vnpay/result")
                 .queryParam("success", success)
                 .queryParam("message", message);
 
@@ -136,8 +134,12 @@ public class VnPayController {
         }
         builder.queryParam("responseCode", vnPayResponse.getResponseCode());
         builder.queryParam("txnRef", vnPayResponse.getTxnRef());
+        if (success) {
+            builder.queryParam("redirect", "orders");
+        }
 
-        String redirectUrl = builder.build(true).toUriString();
+        // encode() để Spring tự mã hóa toàn bộ query param (khoảng trắng, tiếng Việt, v.v.)
+        String redirectUrl = builder.encode().build().toUriString();
 
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(redirectUrl))

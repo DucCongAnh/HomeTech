@@ -33,6 +33,7 @@ public class SessionInterceptor implements HandlerInterceptor {
         // 🔥 Bỏ qua login, register, OAuth login
         if (path.startsWith("/auth")
                 || path.startsWith("/oauth2")
+                || path.startsWith("/payment")
                 || path.equals("/")
                 || path.equals("/home")) {
             return true;

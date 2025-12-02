@@ -28,24 +28,7 @@ public class Customer extends User {
     private List<Order> orders;
 
     @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
-
     private List<Review> reviews;
-
-    public List<Message> getMessages() {
-        return messages;
-    }
-
-    public void setMessages(List<Message> messages) {
-        this.messages = messages;
-    }
-
-    public List<Review> getReviews() {
-        return reviews;
-    }
-
-    public void setReviews(List<Review> reviews) {
-        this.reviews = reviews;
-    }
 
     public List<Order> getOrders() {
         return orders;
@@ -86,8 +69,5 @@ public class Customer extends User {
     public void setLoyaltyPoints(int loyaltyPoints) {
         this.loyaltyPoints = loyaltyPoints;
     }
-
-    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Message> messages;
 }
 

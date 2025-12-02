@@ -96,7 +96,16 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**", "/api/products/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/products/**",
+                                "/api/categories/**",
+                                "/api/content/**",
+                                "/api/reviews/**",
+                                "/api/vouchers/**"
+                        ).permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/chat/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -115,9 +124,27 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 🔥 Chain 2: Web - Session-based, form login with redirects
+    // 🔥 Chain 1.5: Payment callbacks (VNPAY, etc.) - always public, no login redirects
     @Bean
     @Order(2)
+    public SecurityFilterChain paymentFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/payment/**")
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                );
+
+        return http.build();
+    }
+
+    // 🔥 Chain 2: Web - Session-based, form login with redirects
+    @Bean
+    @Order(3)
     public SecurityFilterChain webFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())

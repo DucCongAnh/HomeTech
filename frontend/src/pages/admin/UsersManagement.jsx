@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import api from '../../services/api';
 import styles from './UsersManagement.module.css';
 
-function UsersManagement() {
+function UsersManagement({ onOpenChat }) {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,6 +16,7 @@ function UsersManagement() {
   const [userOrders, setUserOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadUsers();
@@ -330,6 +332,15 @@ function UsersManagement() {
     return <span className={`${styles.orderStatus} ${info.color}`}>{info.label}</span>;
   };
 
+  const handleStartChat = (user) => {
+    if (!user?.id) return;
+    if (onOpenChat) {
+      onOpenChat(user.id);
+    } else {
+      navigate('/admin');
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -395,6 +406,13 @@ function UsersManagement() {
                           onClick={() => handleViewProfile(user.id)}
                         >
                           Xem profile
+                        </button>
+                        <button
+                          className={styles.chatButton}
+                          title="Chat với khách hàng"
+                          onClick={() => handleStartChat(user)}
+                        >
+                          💬
                         </button>
                         <button
                           className={`${styles.lockButton} ${enabled ? styles.locked : styles.unlocked}`}
