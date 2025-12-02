@@ -96,16 +96,31 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // Auth endpoints: only allow public flows, not admin registration
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/api/auth/admin/login",
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password",
+                                "/api/auth/verify-email",
+                                "/api/auth/refresh-token"
+                        ).permitAll()
+                        // Admin-only APIs
+                        .requestMatchers(
+                                "/api/auth/register-admin",
+                                "/api/admin/**"
+                        ).hasRole("ADMIN")
+                        // Chat API requires authenticated (customer or admin) via JWT
+                        .requestMatchers("/api/chat/**").authenticated()
+                        // Public catalogue/content APIs
+                        .requestMatchers(
                                 "/api/products/**",
                                 "/api/categories/**",
                                 "/api/content/**",
                                 "/api/reviews/**",
                                 "/api/vouchers/**"
                         ).permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/chat/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

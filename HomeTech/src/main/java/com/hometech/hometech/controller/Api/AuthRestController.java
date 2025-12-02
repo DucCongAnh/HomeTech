@@ -65,6 +65,23 @@ public class AuthRestController {
     public ResponseEntity<Map<String, Object>> registerAdmin(@Valid @RequestBody RegisterRequest request) {
         Map<String, Object> response = new HashMap<>();
         try {
+            // Chỉ cho phép ADMIN tạo tài khoản admin mới
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                response.put("success", false);
+                response.put("message", "Bạn phải đăng nhập bằng tài khoản admin để thực hiện thao tác này.");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ADMIN".equals(a.getAuthority()));
+
+            if (!isAdmin) {
+                response.put("success", false);
+                response.put("message", "Chỉ admin mới có thể đăng ký tài khoản admin mới.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
+
             String message = authService.registerAdmin(request.getUsername(), request.getEmail(), request.getPassword());
             response.put("success", true);
             response.put("message", message);

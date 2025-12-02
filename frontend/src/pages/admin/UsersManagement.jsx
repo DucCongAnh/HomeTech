@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI } from '../../services/api';
+import { adminAPI, authAPI } from '../../services/api';
 import api from '../../services/api';
 import styles from './UsersManagement.module.css';
 
@@ -16,6 +16,16 @@ function UsersManagement({ onOpenChat }) {
   const [userOrders, setUserOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState(null);
+  const [showAdminForm, setShowAdminForm] = useState(false);
+  const [adminForm, setAdminForm] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [adminFormError, setAdminFormError] = useState('');
+  const [adminFormSuccess, setAdminFormSuccess] = useState('');
+  const [adminFormLoading, setAdminFormLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -341,6 +351,68 @@ function UsersManagement({ onOpenChat }) {
     }
   };
 
+  const handleAdminFormChange = (e) => {
+    const { name, value } = e.target;
+    setAdminForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setAdminFormError('');
+    setAdminFormSuccess('');
+  };
+
+  const handleCreateAdmin = async (e) => {
+    e.preventDefault();
+    setAdminFormError('');
+    setAdminFormSuccess('');
+
+    if (!adminForm.username || !adminForm.email || !adminForm.password || !adminForm.confirmPassword) {
+      setAdminFormError('Vui lòng nhập đầy đủ thông tin.');
+      return;
+    }
+
+    if (adminForm.password !== adminForm.confirmPassword) {
+      setAdminFormError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    if (adminForm.password.length < 6) {
+      setAdminFormError('Mật khẩu phải có ít nhất 6 ký tự.');
+      return;
+    }
+
+    try {
+      setAdminFormLoading(true);
+      const response = await authAPI.registerAdmin(
+        adminForm.username,
+        adminForm.email,
+        adminForm.password,
+      );
+
+      if (response?.success) {
+        setAdminFormSuccess(
+          response.message ||
+            'Tạo tài khoản admin thành công! Vui lòng kiểm tra email để xác thực tài khoản.',
+        );
+        setAdminForm({
+          username: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+        });
+      } else {
+        setAdminFormError(response?.message || 'Tạo tài khoản admin thất bại. Vui lòng thử lại.');
+      }
+    } catch (error) {
+      console.error('Failed to create admin account:', error);
+      setAdminFormError(
+        error.response?.data?.message || 'Tạo tài khoản admin thất bại. Vui lòng thử lại.',
+      );
+    } finally {
+      setAdminFormLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -354,7 +426,90 @@ function UsersManagement({ onOpenChat }) {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>Quản lý Người dùng</h1>
+        <button
+          type="button"
+          className={styles.addAdminButton}
+          onClick={() => setShowAdminForm((prev) => !prev)}
+        >
+          {showAdminForm ? 'Đóng form tạo Admin' : 'Thêm Admin'}
+        </button>
       </div>
+
+      {showAdminForm && (
+        <div className={styles.adminRegisterSection}>
+          <h2 className={styles.sectionTitle}>Tạo tài khoản Admin mới</h2>
+          <p className={styles.sectionSubtitle}>
+            Chỉ admin hiện tại mới có quyền tạo thêm tài khoản admin.
+          </p>
+          <form className={styles.adminForm} onSubmit={handleCreateAdmin}>
+            {adminFormError && (
+              <div className={styles.alertError}>
+                {adminFormError}
+              </div>
+            )}
+            {adminFormSuccess && (
+              <div className={styles.alertSuccess}>
+                {adminFormSuccess}
+              </div>
+            )}
+            <div className={styles.adminFormRow}>
+              <div className={styles.adminFormGroup}>
+                <label>Username</label>
+                <input
+                  type="text"
+                  name="username"
+                  value={adminForm.username}
+                  onChange={handleAdminFormChange}
+                  placeholder="Tên đăng nhập admin"
+                  required
+                />
+              </div>
+              <div className={styles.adminFormGroup}>
+                <label>Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={adminForm.email}
+                  onChange={handleAdminFormChange}
+                  placeholder="Email admin"
+                  required
+                />
+              </div>
+            </div>
+            <div className={styles.adminFormRow}>
+              <div className={styles.adminFormGroup}>
+                <label>Mật khẩu</label>
+                <input
+                  type="password"
+                  name="password"
+                  value={adminForm.password}
+                  onChange={handleAdminFormChange}
+                  placeholder="Mật khẩu (ít nhất 6 ký tự)"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className={styles.adminFormGroup}>
+                <label>Xác nhận mật khẩu</label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={adminForm.confirmPassword}
+                  onChange={handleAdminFormChange}
+                  placeholder="Nhập lại mật khẩu"
+                  required
+                  minLength={6}
+                />
+              </div>
+            </div>
+            <div className={styles.adminFormActions}>
+              <button type="submit" disabled={adminFormLoading}>
+                {adminFormLoading ? 'Đang tạo...' : 'Tạo tài khoản Admin'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className={styles.controls}>
         <div className={styles.searchBox}>

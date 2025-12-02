@@ -4,7 +4,6 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import AdminLogin from './pages/AdminLogin';
-import AdminRegister from './pages/AdminRegister';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import OAuthCallback from './pages/OAuthCallback';
 import Home from './pages/Home';
@@ -36,8 +35,6 @@ function AppRoutes() {
         {/* Admin login - separate URL */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/AdminLogin" element={<AdminLogin />} />
-        <Route path="/admin/register" element={<AdminRegister />} />
-        <Route path="/AdminRegister" element={<AdminRegister />} />
 
         {/* Admin Dashboard */}
         <Route path="/admin" element={<AdminDashboard />} />
