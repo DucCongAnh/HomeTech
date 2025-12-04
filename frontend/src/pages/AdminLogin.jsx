@@ -132,9 +132,7 @@ function AdminLogin() {
           </button>
 
           <div className={styles.footerLinks}>
-            <Link to="/AdminRegister" className={styles.registerLink}>
-              Chưa có tài khoản? Đăng ký Admin
-            </Link>
+            
             <a href="/login" className={styles.backLink}>
               ← Quay lại trang đăng nhập thường
             </a>

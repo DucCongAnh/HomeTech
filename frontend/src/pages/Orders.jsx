@@ -91,6 +91,19 @@ const isWithinCancelWindow = (order) => {
   return diffMinutes <= 30;
 };
 
+const sortOrdersDesc = (rawOrders = []) => {
+  if (!Array.isArray(rawOrders)) return [];
+  const getTimestamp = (order) => {
+    const candidate = order?.createdAt || order?.orderDate || order?.updatedAt || null;
+    const time = candidate ? new Date(candidate).getTime() : NaN;
+    if (!Number.isNaN(time)) {
+      return time;
+    }
+    return typeof order?.id === 'number' ? order.id : Number(order?.id) || 0;
+  };
+  return [...rawOrders].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+};
+
 function Orders() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
@@ -163,7 +176,8 @@ function Orders() {
       const response = status === 'ALL'
         ? await userAPI.getOrders(userInfo.id)
         : await userAPI.getOrdersByStatus(userInfo.id, status);
-      setOrders(unwrapData(response, []));
+      const orderedList = unwrapData(response, []);
+      setOrders(sortOrdersDesc(orderedList));
     } catch (error) {
       console.error('Error loading orders:', error);
       setOrders([]);
