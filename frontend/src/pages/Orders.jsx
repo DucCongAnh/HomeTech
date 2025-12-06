@@ -345,7 +345,12 @@ function Orders() {
                   {getOrderItems(order).map((item) => (
                     <div key={item.id} className={styles.orderItem}>
                       <div className={styles.itemInfo}>
-                        <div className={styles.itemName}>{item.product?.name || 'Sản phẩm'}</div>
+                        <div className={styles.itemName}>
+                          {item.product?.name || 'Sản phẩm'}
+                          {item.variant && (
+                            <span className={styles.variantName}> - {item.variant.name}</span>
+                          )}
+                        </div>
                         <div className={styles.itemDetails}>
                           Số lượng: {item.quantity} × {formatPrice(item.price)}
                         </div>
@@ -463,7 +468,12 @@ function Orders() {
                         onClick={() => handleProductClick(item.product?.id)}
                       >
                         <div>
-                          <p className={styles.detailItemName}>{item.product?.name || 'Sản phẩm'}</p>
+                          <p className={styles.detailItemName}>
+                            {item.product?.name || 'Sản phẩm'}
+                            {item.variant && (
+                              <span className={styles.variantName}> - {item.variant.name}</span>
+                            )}
+                          </p>
                           <p className={styles.detailItemMeta}>
                             {item.quantity} × {formatPrice(item.price)}
                           </p>

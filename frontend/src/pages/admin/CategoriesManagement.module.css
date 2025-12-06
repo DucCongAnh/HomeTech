@@ -361,16 +361,8 @@
   color: #374151;
 }
 
-.formGroup input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  transition: all 0.3s;
-}
-
-.formGroup input:focus {
+.formGroup input,
+.formGroup select,
 .formGroup textarea {
   width: 100%;
   padding: 0.75rem;
@@ -378,16 +370,17 @@
   border-radius: 0.5rem;
   font-size: 1rem;
   transition: all 0.3s;
+  background: white;
+}
+
+.formGroup textarea {
   resize: vertical;
   min-height: 120px;
 }
 
+.formGroup input:focus,
+.formGroup select:focus,
 .formGroup textarea:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -451,6 +444,112 @@
   margin-top: 0.5rem;
   font-size: 0.85rem;
   color: #6b7280;
+}
+
+/* ===== Category Attributes UI ===== */
+
+.attributesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.attributeItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.attributeInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.attributeName {
+  font-weight: 600;
+  color: #111827;
+}
+
+.attributeType {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  align-self: flex-start;
+}
+
+.attributeActions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.attributeActionButton {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.attributeEditButton {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.attributeEditButton:hover {
+  background: #e0e7ff;
+}
+
+.attributeDeleteButton {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.attributeDeleteButton:hover {
+  background: #fecaca;
+}
+
+.attributeEditor {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.attributeEditor input {
+  flex: 1;
+}
+
+.attributeEditor select {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 2px solid #e5e7eb;
+  background: white;
+  font-size: 0.9rem;
+}
+
+.addAttributeButton {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: #10b981;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.addAttributeButton:hover {
+  background: #059669;
 }
 
 .modalActions {

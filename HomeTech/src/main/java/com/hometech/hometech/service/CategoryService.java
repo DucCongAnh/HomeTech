@@ -34,6 +34,12 @@ public class CategoryService {
         if (category.getName() == null || category.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Category name cannot be empty");
         }
+
+        // Gán quan hệ ngược cho các thuộc tính nếu có (để JPA cascade lưu CategoryAttribute)
+        if (category.getAttributes() != null) {
+            category.getAttributes().forEach(attr -> attr.setCategory(category));
+        }
+
         categoryRepo.save(category);
     }
 

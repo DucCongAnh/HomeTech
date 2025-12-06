@@ -28,7 +28,11 @@ export default function ProductsManagement() {
   const [selectedImages, setSelectedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
+  const [originalDisplayOrders, setOriginalDisplayOrders] = useState({}); // Lưu giá trị ban đầu
   const [loadingImages, setLoadingImages] = useState(false);
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
+  const [attributeValues, setAttributeValues] = useState([]);
+  const [variants, setVariants] = useState([]);
 
   useEffect(() => {
     loadInitialData();
@@ -97,7 +101,19 @@ export default function ProductsManagement() {
     try {
       const response = await adminAPI.getProductImages(productId);
       if (response.success) {
-        setExistingImages(response.data || []);
+        // Sắp xếp ảnh theo displayOrder
+        const sortedImages = (response.data || []).sort((a, b) => {
+          const orderA = a.displayOrder != null ? a.displayOrder : 0;
+          const orderB = b.displayOrder != null ? b.displayOrder : 0;
+          return orderA - orderB;
+        });
+        setExistingImages(sortedImages);
+        // Lưu giá trị ban đầu của displayOrder
+        const originalOrders = {};
+        sortedImages.forEach((img) => {
+          originalOrders[img.id] = img.displayOrder != null ? img.displayOrder : 0;
+        });
+        setOriginalDisplayOrders(originalOrders);
       } else {
         throw new Error(response.message || 'Không thể tải ảnh sản phẩm');
       }
@@ -109,22 +125,56 @@ export default function ProductsManagement() {
     }
   };
 
-  const openModal = (product = null) => {
+  const openModal = async (product = null) => {
     if (product) {
-      setEditingProduct(product);
+      // Luôn fetch chi tiết sản phẩm để có đầy đủ attributeValues, variants...
+      let detail = product;
+      try {
+        const res = await adminAPI.getProductById(product.id);
+        if (res.success && res.data) {
+          detail = res.data;
+        }
+      } catch (error) {
+        console.error('openModal getProductById error:', error);
+      }
+
+      setEditingProduct(detail);
       setForm({
-        name: product.name || '',
-        price: product.price ?? '',
-        stock: product.stock ?? '',
-        description: product.description || '',
-        category: { id: product.category?.id?.toString() || '' },
-        hidden: product.hidden ?? false,
+        name: detail.name || '',
+        price: detail.price ?? '',
+        stock: detail.stock ?? '',
+        description: detail.description || '',
+        category: { id: detail.category?.id?.toString() || '' },
+        hidden: detail.hidden ?? false,
       });
-      fetchProductImages(product.id);
+      fetchProductImages(detail.id);
+
+      // Map lại attributeValues và variants từ dữ liệu chi tiết
+      setAttributeValues(
+        (detail.attributeValues || []).map((av) => ({
+          attributeId: av.attribute?.id?.toString() || '',
+          value: av.value || '',
+        })),
+      );
+      setVariants(
+        (detail.variants || []).map((v) => ({
+          id: v.id,
+          name: v.name || '',
+          stock: v.stock ?? 0,
+        })),
+      );
+
+      // Load thuộc tính danh mục tương ứng
+      if (detail.category?.id) {
+        await loadCategoryAttributes(detail.category.id);
+      }
     } else {
       setEditingProduct(null);
       setForm(defaultFormState);
       setExistingImages([]);
+      setCategoryAttributes([]);
+      setAttributeValues([]);
+      setVariants([]);
     }
     setSelectedImages([]);
     setModalOpen(true);
@@ -137,16 +187,94 @@ export default function ProductsManagement() {
     setForm(defaultFormState);
     setSelectedImages([]);
     setExistingImages([]);
+    setOriginalDisplayOrders({});
+    setCategoryAttributes([]);
+    setAttributeValues([]);
+    setVariants([]);
   };
 
   const handleInputChange = (field, value) => {
     if (field === 'category') {
       setForm((prev) => ({ ...prev, category: { id: value } }));
+      if (value) {
+        loadCategoryAttributes(value);
+      } else {
+        setCategoryAttributes([]);
+        setAttributeValues([]);
+      }
     } else if (field === 'hidden') {
       setForm((prev) => ({ ...prev, hidden: value }));
     } else {
       setForm((prev) => ({ ...prev, [field]: value }));
     }
+  };
+
+  const loadCategoryAttributes = async (categoryId) => {
+    try {
+      const response = await adminAPI.getCategoryAttributes(categoryId);
+      if (response.success) {
+        const attrs = response.data || [];
+        setCategoryAttributes(attrs);
+
+        // Đồng bộ attributeValues với danh sách thuộc tính:
+        // - Giữ nguyên giá trị cũ nếu có
+        // - Thêm entry rỗng cho thuộc tính mới
+        setAttributeValues((prev) => {
+          const map = new Map(prev.map((item) => [item.attributeId, item]));
+          return attrs.map((attr) => {
+            const idStr = attr.id.toString();
+            return map.get(idStr) || { attributeId: idStr, value: '' };
+          });
+        });
+      } else {
+        setCategoryAttributes([]);
+        setAttributeValues([]);
+      }
+    } catch (error) {
+      console.error('loadCategoryAttributes error:', error);
+      setCategoryAttributes([]);
+      setAttributeValues([]);
+    }
+  };
+
+  const handleAttributeValueChange = (attributeId, value) => {
+    setAttributeValues((prev) => {
+      const idStr = attributeId.toString();
+      const existing = prev.find((item) => item.attributeId === idStr);
+      if (existing) {
+        return prev.map((item) =>
+          item.attributeId === idStr ? { ...item, value } : item,
+        );
+      }
+      return [...prev, { attributeId: idStr, value }];
+    });
+  };
+
+  const addVariantRow = () => {
+    setVariants((prev) => [
+      ...prev,
+      {
+        name: '',
+        stock: 0,
+      },
+    ]);
+  };
+
+  const updateVariant = (index, field, value) => {
+    setVariants((prev) =>
+      prev.map((variant, idx) =>
+        idx === index
+          ? {
+              ...variant,
+              [field]: field === 'stock' ? Number(value) || 0 : value,
+            }
+          : variant,
+      ),
+    );
+  };
+
+  const removeVariant = (index) => {
+    setVariants((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleImageChange = (event) => {
@@ -179,10 +307,48 @@ export default function ProductsManagement() {
       return;
     }
 
+    const validVariants = variants
+      .filter((v) => (v.name || '').trim() !== '')
+      .map((v) => ({
+        name: v.name.trim(),
+        stock: Number(v.stock) || 0,
+      }));
+
+    if (validVariants.length === 0) {
+      alert('Vui lòng thêm ít nhất một biến thể cho sản phẩm (ví dụ: dung lượng, màu sắc...).');
+      return;
+    }
+
+    // Lưu tất cả các thay đổi displayOrder chưa được lưu trước khi cập nhật sản phẩm
+    if (editingProduct && existingImages.length > 0) {
+      try {
+        const pendingUpdates = existingImages
+          .filter((img) => {
+            // Kiểm tra xem có thay đổi displayOrder không
+            const currentOrder = img.displayOrder != null ? img.displayOrder : 0;
+            // Lấy giá trị từ input nếu có
+            return true; // Sẽ kiểm tra và cập nhật tất cả
+          });
+
+        // Đợi một chút để đảm bảo blur event đã được trigger
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Error saving display orders:', error);
+      }
+    }
+
     const payload = {
       ...form,
       price: Number(form.price),
-      stock: Number(form.stock),
+      // stock sẽ được backend tự tính = tổng stock của các biến thể
+      stock: 0,
+      attributeValues: attributeValues
+        .filter((av) => av.attributeId && av.value?.toString().trim() !== '')
+        .map((av) => ({
+          attribute: { id: Number(av.attributeId) },
+          value: av.value,
+        })),
+      variants: validVariants,
     };
 
     try {
@@ -218,7 +384,8 @@ export default function ProductsManagement() {
       closeModal();
     } catch (error) {
       console.error('handleSubmit error:', error);
-      alert(error.message || 'Có lỗi xảy ra');
+      const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra';
+      alert(errorMessage);
       setSubmitting(false);
     }
   };
@@ -254,6 +421,35 @@ export default function ProductsManagement() {
     } catch (error) {
       console.error('handleDeleteImage error:', error);
       alert(error.message || 'Không thể xóa ảnh');
+    }
+  };
+
+  const handleUpdateDisplayOrder = async (imageId, newOrder) => {
+    try {
+      console.log('Updating display order:', { imageId, newOrder });
+      const response = await adminAPI.updateImageDisplayOrder(imageId, newOrder);
+      console.log('Update display order response:', response);
+      if (!response.success) {
+        throw new Error(response.message || 'Không thể cập nhật thứ tự hiển thị');
+      }
+      // Cập nhật giá trị ban đầu sau khi lưu thành công
+      setOriginalDisplayOrders((prev) => ({
+        ...prev,
+        [imageId]: newOrder,
+      }));
+      // Cập nhật lại danh sách ảnh để đảm bảo thứ tự đúng và hiển thị lại
+      if (editingProduct?.id) {
+        await fetchProductImages(editingProduct.id);
+      }
+    } catch (error) {
+      console.error('handleUpdateDisplayOrder error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể cập nhật thứ tự hiển thị';
+      alert(errorMessage);
+      // Reload images để khôi phục giá trị cũ
+      if (editingProduct?.id) {
+        await fetchProductImages(editingProduct.id);
+      }
+      throw error; // Re-throw để caller biết có lỗi
     }
   };
 
@@ -433,17 +629,6 @@ export default function ProductsManagement() {
               </div>
 
               <div className={styles.formGroup}>
-                <label>Tồn kho</label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={form.stock}
-                  onChange={(event) => handleInputChange('stock', event.target.value)}
-                />
-              </div>
-
-              <div className={styles.formGroup}>
                 <label>Danh mục</label>
                 <select
                   required
@@ -459,6 +644,32 @@ export default function ProductsManagement() {
                 </select>
               </div>
 
+              {categoryAttributes.length > 0 && (
+                <div className={styles.formGroup}>
+                  <label>Thuộc tính sản phẩm theo danh mục</label>
+                  <div className={styles.attributesGrid}>
+                    {categoryAttributes.map((attr) => {
+                      const current = attributeValues.find(
+                        (av) => av.attributeId === attr.id.toString(),
+                      );
+                      return (
+                        <div key={attr.id} className={styles.attributeRow}>
+                          <span className={styles.attributeLabel}>{attr.name}</span>
+                          <input
+                            type={attr.inputType === 'NUMBER' ? 'number' : 'text'}
+                            value={current?.value || ''}
+                            onChange={(e) =>
+                              handleAttributeValueChange(attr.id, e.target.value)
+                            }
+                            placeholder={`Nhập ${attr.name.toLowerCase()}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className={styles.formGroup}>
                 <label>Mô tả</label>
                 <textarea
@@ -467,6 +678,64 @@ export default function ProductsManagement() {
                   onChange={(event) => handleInputChange('description', event.target.value)}
                   placeholder="Mô tả ngắn gọn/đầy đủ về sản phẩm"
                 />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Biến thể sản phẩm</label>
+                {variants.length === 0 && (
+                  <p className={styles.helperText}>
+                    Bạn có thể thêm các biến thể (ví dụ: dung lượng, màu sắc...) với tồn kho riêng.
+                  </p>
+                )}
+                {variants.length > 0 && (
+                  <div className={styles.variantsList}>
+                    {variants.map((variant, index) => (
+                      <div key={index} className={styles.variantRow}>
+                        <div className={styles.variantInputs}>
+                          <input
+                            type="text"
+                            className={styles.variantNameInput}
+                            value={variant.name}
+                            onChange={(e) =>
+                              updateVariant(index, 'name', e.target.value)
+                            }
+                            placeholder="Tên biến thể (VD: 64GB Đen)"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            className={styles.variantStockInput}
+                            value={variant.stock}
+                            onChange={(e) =>
+                              updateVariant(index, 'stock', e.target.value)
+                            }
+                            placeholder="Tồn kho"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.variantDeleteButton}
+                          onClick={() => removeVariant(index)}
+                          title="Xóa biến thể"
+                        >
+                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={styles.addVariantButton}
+                  onClick={addVariantRow}
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Thêm biến thể
+                </button>
               </div>
 
               {editingProduct && (
@@ -492,7 +761,42 @@ export default function ProductsManagement() {
                             src={`data:image/*;base64,${image.imageData}`}
                             alt={image.fileName || `Ảnh #${image.id}`}
                           />
-                          <span>{image.fileName || `Ảnh #${image.id}`}</span>
+                          <div className={styles.imageInfo}>
+                            <span>{image.fileName || `Ảnh #${image.id}`}</span>
+                            <div className={styles.displayOrderControl}>
+                              <label>Thứ tự:</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={image.displayOrder != null ? image.displayOrder : 0}
+                                onChange={(e) => {
+                                  const newOrder = parseInt(e.target.value) || 0;
+                                  setExistingImages((prev) =>
+                                    prev.map((img) =>
+                                      img.id === image.id ? { ...img, displayOrder: newOrder } : img
+                                    )
+                                  );
+                                }}
+                                onBlur={async (e) => {
+                                  const newOrder = parseInt(e.target.value) || 0;
+                                  const originalOrder = originalDisplayOrders[image.id] != null ? originalDisplayOrders[image.id] : 0;
+                                  console.log('onBlur - Image ID:', image.id, 'New Order:', newOrder, 'Original Order:', originalOrder);
+                                  if (newOrder !== originalOrder) {
+                                    console.log('Calling handleUpdateDisplayOrder for image:', image.id);
+                                    await handleUpdateDisplayOrder(image.id, newOrder);
+                                  } else {
+                                    console.log('No change detected, skipping API call');
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.target.blur(); // Trigger onBlur
+                                  }
+                                }}
+                                className={styles.displayOrderInput}
+                              />
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>

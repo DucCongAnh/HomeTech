@@ -3,7 +3,9 @@ package com.hometech.hometech.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,7 +15,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})  // 🔥 THÊM DÒNG NÀY
-
 public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,6 +23,8 @@ public class Product {
     private String name;
     private double price;
     private int stock;
+    
+    @Column(length = 5000)
     private String description;
 
     public String getDescription() {
@@ -116,6 +119,14 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Review> reviews;
+
+    // Thuộc tính kế thừa từ danh mục, kèm giá trị cụ thể cho sản phẩm
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProductAttributeValue> attributeValues;
+
+    // Danh sách biến thể sản phẩm, mỗi biến thể có tên + stock riêng
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProductVariant> variants;
 
     public List<ProductImage> getImages() {
         return images;

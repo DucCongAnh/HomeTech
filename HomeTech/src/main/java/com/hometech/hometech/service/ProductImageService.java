@@ -26,6 +26,14 @@ public class ProductImageService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm"));
 
+        // Lấy số lượng ảnh hiện có để đặt displayOrder cho ảnh mới
+        List<ProductImage> existingImages = productImageRepository.findByProduct_Id(productId);
+        int nextOrder = existingImages.isEmpty() ? 0 : 
+            existingImages.stream()
+                .mapToInt(img -> img.getDisplayOrder() != null ? img.getDisplayOrder() : 0)
+                .max()
+                .orElse(0) + 1;
+
         List<ProductImage> images = new ArrayList<>();
 
         try {
@@ -34,6 +42,7 @@ public class ProductImageService {
                 img.setFileName(file.getOriginalFilename());
                 img.setImageData(file.getBytes());
                 img.setProduct(product);
+                img.setDisplayOrder(nextOrder++);
 
                 images.add(img);
             }
@@ -47,7 +56,14 @@ public class ProductImageService {
 
 
     public List<ProductImage> getImages(Long productId) {
-        return productImageRepository.findByProduct_Id(productId);
+        return productImageRepository.findByProduct_IdOrderByDisplayOrderAsc(productId);
+    }
+
+    public ProductImage updateDisplayOrder(Long imageId, Integer displayOrder) {
+        ProductImage image = productImageRepository.findById(imageId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh"));
+        image.setDisplayOrder(displayOrder);
+        return productImageRepository.save(image);
     }
 
     public void deleteImage(Long id) {

@@ -146,7 +146,11 @@ export default function Checkout() {
     try {
       setLoading(true);
       const response = await userAPI.getCart(userId);
-      setCartItems(response.data || []);
+      // Response có thể là { success: true, data: [...] } hoặc trực tiếp là array
+      const items = (response.data && Array.isArray(response.data)) 
+        ? response.data 
+        : (Array.isArray(response) ? response : []);
+      setCartItems(items);
       setVoucherPreview(null);
       setVoucherFeedback('');
       setVoucherError('');
@@ -336,7 +340,12 @@ export default function Checkout() {
               {cartItems.map((item) => (
                 <div key={item.id} className={styles.itemRow}>
                   <div className={styles.itemInfo}>
-                    <p className={styles.itemName}>{item.product?.name || 'Sản phẩm'}</p>
+                    <p className={styles.itemName}>
+                      {item.product?.name || 'Sản phẩm'}
+                      {item.variant && (
+                        <span className={styles.variantName}> - {item.variant.name}</span>
+                      )}
+                    </p>
                     <span className={styles.itemQuantity}>x{item.quantity}</span>
                   </div>
                   <div className={styles.itemPrice}>

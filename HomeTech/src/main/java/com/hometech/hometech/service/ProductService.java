@@ -4,6 +4,8 @@ import com.hometech.hometech.Repository.CategoryRepository;
 import com.hometech.hometech.Repository.ProductRepository;
 import com.hometech.hometech.model.Category;
 import com.hometech.hometech.model.Product;
+import com.hometech.hometech.model.ProductAttributeValue;
+import com.hometech.hometech.model.ProductVariant;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,6 +23,26 @@ public class ProductService {
         this.categoryRepository = categoryRepository;
     }
     public Product save(Product product) {
+        // Gán quan hệ ngược cho attributeValues và variants nếu có
+        if (product.getAttributeValues() != null) {
+            for (ProductAttributeValue value : product.getAttributeValues()) {
+                value.setProduct(product);
+            }
+        }
+        if (product.getVariants() != null) {
+            for (ProductVariant variant : product.getVariants()) {
+                variant.setProduct(product);
+            }
+        }
+
+        // Nếu có biến thể, có thể tự động cập nhật tổng tồn kho = tổng stock của các biến thể
+        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+            int totalStock = product.getVariants().stream()
+                    .mapToInt(ProductVariant::getStock)
+                    .sum();
+            product.setStock(totalStock);
+        }
+
         // Tự động ẩn sản phẩm khi tồn kho = 0
         updateHiddenBasedOnStock(product);
         return productRepository.save(product);

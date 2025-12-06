@@ -66,6 +66,19 @@ public class OrderItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
+    @JsonIgnoreProperties({"variants", "reviews", "images", "attributeValues", "category"})
     private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "variant_id")
+    private ProductVariant variant;
+
+    public ProductVariant getVariant() {
+        return variant;
+    }
+
+    public void setVariant(ProductVariant variant) {
+        this.variant = variant;
+    }
 }
 

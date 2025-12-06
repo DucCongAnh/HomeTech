@@ -1,7 +1,9 @@
 package com.hometech.hometech.controller.Api;
 
 import com.hometech.hometech.model.Category;
+import com.hometech.hometech.model.CategoryAttribute;
 import com.hometech.hometech.model.Product;
+import com.hometech.hometech.service.CategoryAttributeService;
 import com.hometech.hometech.service.CategoryService;
 import com.hometech.hometech.service.NotifyService;
 import org.springframework.http.HttpStatus;
@@ -15,11 +17,14 @@ import java.util.*;
 public class CategoryRestController {
 
     private final CategoryService categoryService;
+    private final CategoryAttributeService categoryAttributeService;
     private final NotifyService notifyService;
 
     public CategoryRestController(CategoryService categoryService,
+                                  CategoryAttributeService categoryAttributeService,
                                   NotifyService notifyService) {
         this.categoryService = categoryService;
+        this.categoryAttributeService = categoryAttributeService;
         this.notifyService = notifyService;
     }
 
@@ -111,6 +116,70 @@ public class CategoryRestController {
         info.put("activeProducts", activeProducts);
 
         return buildResponse(true, "Lấy thông tin danh mục thành công", info, null, HttpStatus.OK);
+    }
+
+    // ================== CATEGORY ATTRIBUTES ==================
+
+    // 🟢 Lấy danh sách thuộc tính của danh mục
+    @GetMapping("/{categoryId}/attributes")
+    public ResponseEntity<Map<String, Object>> getCategoryAttributes(@PathVariable Long categoryId) {
+        try {
+            List<CategoryAttribute> attributes = categoryAttributeService.getByCategoryId(categoryId);
+            return buildResponse(true, "Lấy thuộc tính danh mục thành công", attributes, null, HttpStatus.OK);
+        } catch (Exception e) {
+            return buildResponse(false, "Không thể lấy thuộc tính danh mục", null,
+                    e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 🟢 Thêm thuộc tính cho danh mục
+    @PostMapping("/{categoryId}/attributes")
+    public ResponseEntity<Map<String, Object>> createCategoryAttribute(
+            @PathVariable Long categoryId,
+            @RequestBody CategoryAttribute attribute
+    ) {
+        try {
+            if (attribute.getName() == null || attribute.getName().trim().isEmpty()) {
+                return buildResponse(false, "Tên thuộc tính không được để trống", null,
+                        "Attribute name is required", HttpStatus.BAD_REQUEST);
+            }
+            CategoryAttribute created = categoryAttributeService.createForCategory(categoryId, attribute);
+            return buildResponse(true, "Thêm thuộc tính danh mục thành công", created, null, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return buildResponse(false, e.getMessage(), null, e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            return buildResponse(false, "Có lỗi khi thêm thuộc tính: " + e.getMessage(), null,
+                    e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 🟢 Cập nhật thuộc tính danh mục
+    @PutMapping("/attributes/{id}")
+    public ResponseEntity<Map<String, Object>> updateCategoryAttribute(
+            @PathVariable Long id,
+            @RequestBody CategoryAttribute attribute
+    ) {
+        try {
+            CategoryAttribute updated = categoryAttributeService.updateAttribute(id, attribute);
+            return buildResponse(true, "Cập nhật thuộc tính danh mục thành công", updated, null, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return buildResponse(false, e.getMessage(), null, e.getMessage(), HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return buildResponse(false, "Có lỗi khi cập nhật thuộc tính: " + e.getMessage(), null,
+                    e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 🟢 Xoá thuộc tính danh mục
+    @DeleteMapping("/attributes/{id}")
+    public ResponseEntity<Map<String, Object>> deleteCategoryAttribute(@PathVariable Long id) {
+        try {
+            categoryAttributeService.deleteAttribute(id);
+            return buildResponse(true, "Xóa thuộc tính danh mục thành công", null, null, HttpStatus.OK);
+        } catch (Exception e) {
+            return buildResponse(false, "Không thể xóa thuộc tính danh mục", null,
+                    e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     // 🟢 Tạo danh mục mới

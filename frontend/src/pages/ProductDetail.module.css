@@ -338,6 +338,182 @@
   font-size: 1rem;
 }
 
+/* Variant Selector */
+.variantSelector {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+  border-radius: 0.75rem;
+  border: 1px solid #e0e7ff;
+}
+
+.variantLabel {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.variantLabel strong {
+  color: #667eea;
+  font-size: 1.1rem;
+}
+
+.variantOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.variantOption {
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  background: white;
+  border: 2px solid #e0e7ff;
+  border-radius: 0.625rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 100px;
+  justify-content: center;
+}
+
+.variantOption:hover:not(:disabled) {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+}
+
+.variantOption:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.2);
+}
+
+.variantSelected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border-color: #667eea !important;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.35) !important;
+  transform: translateY(-2px);
+}
+
+.variantSelected::before {
+  content: '✓';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  background: #10b981;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  animation: checkmarkAppear 0.3s ease-out;
+}
+
+@keyframes checkmarkAppear {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.variantOutOfStock {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6 !important;
+  border-color: #d1d5db !important;
+  color: #9ca3af !important;
+  position: relative;
+}
+
+.variantOutOfStock::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  transform: translateY(-50%);
+}
+
+.variantOutOfStock:hover {
+  transform: none !important;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.08) !important;
+  border-color: #d1d5db !important;
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+}
+
+.variantOption:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.outOfStockBadge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0.25rem;
+  margin-left: 0.5rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.variantInfo {
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  background: white;
+  border-radius: 0.5rem;
+  border-left: 3px solid #667eea;
+  font-size: 0.95rem;
+  color: #4a5568;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.variantInfo strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.variantInfo::before {
+  content: '📦';
+  font-size: 1.2rem;
+}
+
 .quantitySelector {
   display: flex;
   align-items: center;

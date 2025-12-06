@@ -56,8 +56,12 @@ const Cart = () => {
       }
       const response = await userAPI.getCart(userInfo.id);
       console.log('Cart API response:', response);
-      const items = response.data || [];
+      // Response có thể là { success: true, data: [...] } hoặc trực tiếp là array
+      const items = (response.data && Array.isArray(response.data)) 
+        ? response.data 
+        : (Array.isArray(response) ? response : []);
       console.log('Cart items:', items);
+      console.log('Items count:', items.length);
       setCartItems(items);
 
       // Load images for all products
@@ -300,6 +304,9 @@ const Cart = () => {
                   <div className={styles.itemInfo}>
                     <Link to={`/product/${item.product?.id}`} className={styles.itemName}>
                       {item.product?.name || 'Sản phẩm không tồn tại'}
+                      {item.variant && (
+                        <span className={styles.variantName}> - {item.variant.name}</span>
+                      )}
                     </Link>
                     <div className={styles.itemPrice}>
                       {item.product?.price ? formatPrice(item.product.price) : 'N/A'}

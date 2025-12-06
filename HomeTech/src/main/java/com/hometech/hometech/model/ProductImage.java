@@ -22,6 +22,17 @@ public class ProductImage {
 
     private String fileName; // tên file ảnh (tùy chọn)
 
+    @Column(nullable = false)
+    private Integer displayOrder = 0; // số thứ tự hiển thị ảnh
+
+    public Integer getDisplayOrder() {
+        return displayOrder;
+    }
+
+    public void setDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
+    }
+
     public Product getProduct() {
         return product;
     }

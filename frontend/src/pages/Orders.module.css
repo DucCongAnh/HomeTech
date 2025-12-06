@@ -240,6 +240,17 @@
   flex: 1;
 }
 
+.variantName {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #667eea;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-radius: 0.25rem;
+  display: inline-block;
+}
+
 .itemName {
   font-weight: 500;
   color: #333;

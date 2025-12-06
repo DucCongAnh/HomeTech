@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { adminAPI } from '../../services/api';
 import styles from './CategoriesManagement.module.css';
 
 export default function CategoriesManagement() {
@@ -8,6 +9,8 @@ export default function CategoriesManagement() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ name: '', hidden: false });
   const [searchTerm, setSearchTerm] = useState('');
+  const [attributes, setAttributes] = useState([]);
+  const [newAttribute, setNewAttribute] = useState({ name: '' });
 
   useEffect(() => {
     fetchCategories();
@@ -62,19 +65,28 @@ export default function CategoriesManagement() {
       };
 
       let response;
+      // Gửi kèm danh sách thuộc tính để backend lưu/cập nhật
+      const payload = {
+        ...formData,
+        attributes: attributes.map((attr) => ({
+          id: attr.id || null,
+          name: attr.name,
+          code: attr.code || null,
+        })),
+      };
       if (editingCategory) {
         // Update
         response = await fetch(`/api/categories/${editingCategory.id}`, {
           method: 'PUT',
           headers,
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
       } else {
         // Create
         response = await fetch('/api/categories', {
           method: 'POST',
           headers,
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
       }
 
@@ -122,6 +134,8 @@ export default function CategoriesManagement() {
   const resetForm = () => {
     setFormData({ name: '', hidden: false });
     setEditingCategory(null);
+    setAttributes([]);
+    setNewAttribute({ name: '' });
   };
 
   const openCreateModal = () => {
@@ -135,7 +149,101 @@ export default function CategoriesManagement() {
       name: category.name,
       hidden: category.hidden
     });
-    setShowModal(true);
+
+    // Load thuộc tính danh mục
+    adminAPI
+      .getCategoryAttributes(category.id)
+      .then((res) => {
+        if (res.success) {
+          setAttributes(res.data || []);
+        } else {
+          setAttributes([]);
+        }
+      })
+      .catch(() => setAttributes([]))
+      .finally(() => setShowModal(true));
+  };
+
+  const handleAddAttribute = async () => {
+    if (!newAttribute.name.trim()) {
+      alert('Tên thuộc tính không được để trống');
+      return;
+    }
+
+    // Nếu đang chỉnh sửa danh mục đã tồn tại -> tạo thuộc tính ngay trên server
+    if (editingCategory) {
+      try {
+        const res = await adminAPI.createCategoryAttribute(editingCategory.id, {
+          name: newAttribute.name.trim(),
+          code: null,
+        });
+        if (!res.success) throw new Error(res.message || 'Không thể thêm thuộc tính');
+        setAttributes((prev) => [...prev, res.data]);
+        setNewAttribute({ name: '' });
+      } catch (error) {
+        alert(error.message || 'Không thể thêm thuộc tính');
+      }
+      return;
+    }
+
+    // Nếu đang tạo danh mục mới -> chỉ lưu tạm vào state, sẽ gửi lên sau khi tạo xong danh mục
+    setAttributes((prev) => [
+      ...prev,
+      {
+        // local-only object, chưa có id
+        name: newAttribute.name.trim(),
+      },
+    ]);
+    setNewAttribute({ name: '' });
+  };
+
+  const handleDeleteAttribute = async (attribute, index) => {
+    // Nếu đang tạo danh mục mới hoặc thuộc tính chưa có id -> chỉ xoá trên state
+    if (!editingCategory || !attribute.id) {
+      setAttributes((prev) => prev.filter((_, i) => i !== index));
+      return;
+    }
+
+    if (!window.confirm('Bạn có chắc chắn muốn xóa thuộc tính này?')) return;
+    try {
+      const res = await adminAPI.deleteCategoryAttribute(attribute.id);
+      if (!res.success) throw new Error(res.message || 'Không thể xóa thuộc tính');
+      setAttributes((prev) => prev.filter((attr) => attr.id !== attribute.id));
+    } catch (error) {
+      alert(error.message || 'Không thể xóa thuộc tính');
+    }
+  };
+
+  const handleEditAttribute = async (attribute, index) => {
+    const currentName = attribute.name || '';
+    const newName = window.prompt('Nhập tên thuộc tính mới', currentName);
+
+    // Người dùng bấm Hủy hoặc không thay đổi gì
+    if (!newName || newName.trim() === currentName) return;
+
+    // Nếu thuộc tính chỉ tồn tại ở client (khi đang tạo danh mục mới)
+    if (!attribute.id) {
+      setAttributes((prev) =>
+        prev.map((attr, i) =>
+          i === index ? { ...attr, name: newName.trim() } : attr,
+        ),
+      );
+      return;
+    }
+
+    try {
+      const res = await adminAPI.updateCategoryAttribute(attribute.id, {
+        ...attribute,
+        name: newName.trim(),
+      });
+      if (!res.success) throw new Error(res.message || 'Không thể cập nhật thuộc tính');
+
+      setAttributes((prev) =>
+        prev.map((attr) => (attr.id === attribute.id ? res.data : attr)),
+      );
+    } catch (error) {
+      alert(error.message || 'Không thể cập nhật thuộc tính');
+    }
   };
 
   const filteredCategories = categories.filter(cat =>
@@ -271,6 +379,61 @@ export default function CategoriesManagement() {
                   />
                   <span>Hiển thị danh mục này</span>
                 </label>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Thuộc tính danh mục</label>
+                {attributes.length === 0 ? (
+                  <p className={styles.helperText}>
+                    {editingCategory
+                      ? 'Chưa có thuộc tính nào cho danh mục này. Hãy thêm thuộc tính bên dưới.'
+                      : 'Bạn có thể thêm các thuộc tính (ví dụ: RAM, Độ phân giải) cho danh mục này. Các thuộc tính sẽ được lưu sau khi bạn tạo danh mục.'}
+                  </p>
+                ) : (
+                  <div className={styles.attributesList}>
+                    {attributes.map((attr, index) => (
+                      <div key={attr.id ?? `local-${index}`} className={styles.attributeItem}>
+                        <div className={styles.attributeInfo}>
+                          <span className={styles.attributeName}>{attr.name}</span>
+                        </div>
+                        <div className={styles.attributeActions}>
+                          <button
+                            type="button"
+                            className={`${styles.attributeActionButton} ${styles.attributeEditButton}`}
+                            onClick={() => handleEditAttribute(attr, index)}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.attributeActionButton} ${styles.attributeDeleteButton}`}
+                            onClick={() => handleDeleteAttribute(attr, index)}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className={styles.attributeEditor}>
+                  <input
+                    type="text"
+                    value={newAttribute.name}
+                    onChange={(e) =>
+                      setNewAttribute((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Tên thuộc tính (vd: RAM, Độ phân giải)"
+                  />
+                  <button
+                    type="button"
+                    className={styles.addAttributeButton}
+                    onClick={handleAddAttribute}
+                  >
+                    Thêm thuộc tính
+                  </button>
+                </div>
               </div>
 
               <div className={styles.modalActions}>

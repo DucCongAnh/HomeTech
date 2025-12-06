@@ -3,10 +3,12 @@ package com.hometech.hometech.service;
 import com.hometech.hometech.Repository.CartItemRepository;
 import com.hometech.hometech.Repository.CustomerRepository;
 import com.hometech.hometech.Repository.ProductRepository;
+import com.hometech.hometech.Repository.ProductVariantRepository;
 import com.hometech.hometech.model.Cart;
 import com.hometech.hometech.model.CartItem;
 import com.hometech.hometech.model.Customer;
 import com.hometech.hometech.model.Product;
+import com.hometech.hometech.model.ProductVariant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,15 +25,18 @@ public class CartService {
     private final ProductRepository productRepo;
     private final CustomerRepository customerRepo;
     private final NotifyService notifyService;
+    private final ProductVariantRepository productVariantRepository;
 
     public CartService(CartItemRepository cartRepo,
                        ProductRepository productRepo,
                        CustomerRepository customerRepo,
-                       NotifyService notifyService) {
+                       NotifyService notifyService,
+                       ProductVariantRepository productVariantRepository) {
         this.cartRepo = cartRepo;
         this.productRepo = productRepo;
         this.customerRepo = customerRepo;
         this.notifyService = notifyService;
+        this.productVariantRepository = productVariantRepository;
     }
 
     // Lấy customer theo userId hoặc ném ngoại lệ
@@ -116,41 +121,82 @@ public class CartService {
 
 
     // Thêm sản phẩm vào giỏ của user
-    public CartItem addProduct(long userId, long productId, int quantity) {
+    public CartItem addProduct(long userId, long productId, int quantity, Long variantId) {
         Customer customer = getCustomerByUserIdOrThrow(userId);
 
         Product product = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found with id=" + productId));
 
-        validateProductAvailability(product);
+        ProductVariant variant = null;
+        if (variantId != null) {
+            variant = productVariantRepository.findById(variantId)
+                    .orElseThrow(() -> new RuntimeException("Variant not found with id=" + variantId));
+            // Kiểm tra variant thuộc về product này
+            if (!Objects.equals(variant.getProduct().getId(), productId)) {
+                throw new RuntimeException("Variant does not belong to this product");
+            }
+            // Kiểm tra stock của variant
+            if (variant.getStock() <= 0) {
+                throw new RuntimeException("Biến thể đã hết hàng");
+            }
+            if (quantity > variant.getStock()) {
+                throw new RuntimeException("Số lượng vượt quá tồn kho của biến thể");
+            }
+        } else {
+            validateProductAvailability(product);
+            if (quantity > product.getStock()) {
+                throw new RuntimeException("Số lượng vượt quá tồn kho");
+            }
+        }
 
         // ensure cart exists
         ensureCustomerHasCart(customer);
 
-        // tìm item có cùng product id trong cùng cart (so sánh bằng Objects.equals)
+        // tìm item có cùng product id và variant id trong cùng cart
         List<CartItem> existingItems = cartRepo.findByCart(customer.getCart());
+        final ProductVariant finalVariant = variant;
         Optional<CartItem> existingItem = existingItems.stream()
-                .filter(item -> item.getProduct() != null && Objects.equals(item.getProduct().getId(), product.getId()))
+                .filter(item -> {
+                    if (item.getProduct() == null || !Objects.equals(item.getProduct().getId(), productId)) {
+                        return false;
+                    }
+                    // So sánh variant: cả hai đều null hoặc cả hai đều có cùng id
+                    Long itemVariantId = item.getVariant() != null ? item.getVariant().getId() : null;
+                    Long requestVariantId = finalVariant != null ? finalVariant.getId() : null;
+                    return Objects.equals(itemVariantId, requestVariantId);
+                })
                 .findFirst();
 
         CartItem savedItem;
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
-            int newQuantity = ensureQuantityWithinStock(item.getQuantity() + quantity, product);
+            int currentQuantity = item.getQuantity();
+            int newQuantity = currentQuantity + quantity;
+            
+            // Kiểm tra stock
+            if (finalVariant != null) {
+                if (newQuantity > finalVariant.getStock()) {
+                    throw new RuntimeException("Số lượng vượt quá tồn kho của biến thể");
+                }
+            } else {
+                newQuantity = ensureQuantityWithinStock(newQuantity, product);
+            }
+            
             item.setQuantity(newQuantity);
             savedItem = cartRepo.save(item);
         } else {
-            int sanitizedQuantity = ensureQuantityWithinStock(quantity, product);
             CartItem newItem = new CartItem();
             newItem.setProduct(product);
+            newItem.setVariant(finalVariant);
             newItem.setCart(customer.getCart());
-            newItem.setQuantity(sanitizedQuantity);
+            newItem.setQuantity(quantity);
             savedItem = cartRepo.save(newItem);
         }
 
         try {
             String productName = product.getName() != null ? product.getName() : "sản phẩm";
-            String message = String.format("Bạn đã thêm %d x \"%s\" vào giỏ hàng", quantity, productName);
+            String variantName = finalVariant != null ? " (" + finalVariant.getName() + ")" : "";
+            String message = String.format("Bạn đã thêm %d x \"%s%s\" vào giỏ hàng", quantity, productName, variantName);
             notifyService.createNotification(customer.getId(), message, "CART_ADD", product.getId());
         } catch (Exception e) {
             System.err.println("❌ Failed to send cart notification: " + e.getMessage());

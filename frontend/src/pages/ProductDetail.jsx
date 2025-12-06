@@ -25,6 +25,8 @@ function ProductDetail() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [favoriteUpdating, setFavoriteUpdating] = useState(false);
+  const [variants, setVariants] = useState([]);
+  const [selectedVariant, setSelectedVariant] = useState(null);
 
   useEffect(() => {
     loadProductData();
@@ -66,18 +68,25 @@ function ProductDetail() {
     try {
       setLoading(true);
 
-      const [productRes, imagesRes, reviewsRes, ratingRes] = await Promise.all([
+      const [productRes, imagesRes, reviewsRes, ratingRes, variantsRes] = await Promise.all([
         userAPI.getProductById(id),
         userAPI.getProductImages(id),
         userAPI.getProductReviews(id),
-        userAPI.getProductRating(id)
+        userAPI.getProductRating(id),
+        userAPI.getProductVariants(id).catch(() => ({ data: [] })) // Nếu không có variants, trả về mảng rỗng
       ]);
 
       const productData = productRes.data;
       setProduct(productData);
 
       const imagesData = imagesRes.data || [];
-      setImages(imagesData.map(img => ({
+      // Sắp xếp ảnh theo displayOrder
+      const sortedImages = imagesData.sort((a, b) => {
+        const orderA = a.displayOrder != null ? a.displayOrder : 0;
+        const orderB = b.displayOrder != null ? b.displayOrder : 0;
+        return orderA - orderB;
+      });
+      setImages(sortedImages.map(img => ({
         ...img,
         url: img.imageData ? `data:image/jpeg;base64,${img.imageData}` : null
       })));
@@ -87,6 +96,9 @@ function ProductDetail() {
 
       const rating = ratingRes.data || 0;
       setAverageRating(rating);
+
+      const variantsData = variantsRes.data || [];
+      setVariants(variantsData);
 
       // Load responses for all reviews
       const responsePromises = reviewsData.map(async (review) => {
@@ -153,17 +165,26 @@ function ProductDetail() {
       return;
     }
 
-    if (quantity < 1 || quantity > product.stock) {
-      alert(`Số lượng không hợp lệ. Vui lòng chọn từ 1 đến ${product.stock} sản phẩm.`);
+    // Nếu có variants, bắt buộc phải chọn variant
+    if (variants.length > 0 && !selectedVariant) {
+      alert('Vui lòng chọn biến thể sản phẩm trước khi thêm vào giỏ hàng');
+      return;
+    }
+
+    // Kiểm tra stock dựa trên variant hoặc product
+    const availableStock = selectedVariant ? selectedVariant.stock : product.stock;
+    if (quantity < 1 || quantity > availableStock) {
+      alert(`Số lượng không hợp lệ. Vui lòng chọn từ 1 đến ${availableStock} sản phẩm.`);
       return;
     }
 
     try {
       setAddingToCart(true);
-      console.log('Adding to cart:', { userId: userInfo.id, productId: product.id, quantity });
-      const response = await userAPI.addToCart(userInfo.id, product.id, quantity);
+      console.log('Adding to cart:', { userId: userInfo.id, productId: product.id, quantity, variantId: selectedVariant?.id });
+      const response = await userAPI.addToCart(userInfo.id, product.id, quantity, selectedVariant?.id);
       console.log('Add to cart response:', response);
-      alert(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+      const variantName = selectedVariant ? ` (${selectedVariant.name})` : '';
+      alert(`Đã thêm ${quantity} sản phẩm${variantName} vào giỏ hàng!`);
       setQuantity(1); // Reset về 1 sau khi thêm thành công
       loadCartCount(); // Refresh cart count
     } catch (error) {
@@ -174,7 +195,8 @@ function ProductDetail() {
         alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         navigate('/login');
       } else {
-        alert('Có lỗi xảy ra khi thêm sản phẩm vào giỏ hàng: ' + (error.message || 'Unknown error'));
+        const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+        alert('Có lỗi xảy ra khi thêm sản phẩm vào giỏ hàng: ' + errorMessage);
       }
     } finally {
       setAddingToCart(false);
@@ -189,17 +211,22 @@ function ProductDetail() {
       return;
     }
 
-    if (product.stock <= 0) {
+    const availableStock = selectedVariant ? selectedVariant.stock : product.stock;
+    if (availableStock <= 0) {
       alert('Sản phẩm đã hết hàng');
       return;
     }
 
-    if (quantity < 1 || quantity > product.stock) {
-      alert(`Số lượng không hợp lệ. Vui lòng chọn từ 1 đến ${product.stock} sản phẩm.`);
+    if (quantity < 1 || quantity > availableStock) {
+      alert(`Số lượng không hợp lệ. Vui lòng chọn từ 1 đến ${availableStock} sản phẩm.`);
       return;
     }
 
-    navigate(`/checkout?buyNow=1&productId=${product.id}&quantity=${quantity}`);
+    let url = `/checkout?buyNow=1&productId=${product.id}&quantity=${quantity}`;
+    if (selectedVariant) {
+      url += `&variantId=${selectedVariant.id}`;
+    }
+    navigate(url);
   };
 
   const handleToggleFavorite = async () => {
@@ -231,7 +258,8 @@ function ProductDetail() {
   };
 
   const handleIncreaseQuantity = () => {
-    if (product && quantity < product.stock) {
+    const availableStock = selectedVariant ? selectedVariant.stock : product.stock;
+    if (product && quantity < availableStock) {
       setQuantity(quantity + 1);
     }
   };
@@ -245,13 +273,22 @@ function ProductDetail() {
   const handleQuantityChange = (e) => {
     const value = parseInt(e.target.value) || 1;
     if (product) {
+      const availableStock = selectedVariant ? selectedVariant.stock : product.stock;
       if (value < 1) {
         setQuantity(1);
-      } else if (value > product.stock) {
-        setQuantity(product.stock);
+      } else if (value > availableStock) {
+        setQuantity(availableStock);
       } else {
         setQuantity(value);
       }
+    }
+  };
+
+  const handleVariantChange = (variant) => {
+    setSelectedVariant(variant);
+    // Reset quantity nếu vượt quá stock của variant mới
+    if (variant && quantity > variant.stock) {
+      setQuantity(variant.stock);
     }
   };
 
@@ -479,11 +516,41 @@ function ProductDetail() {
             </div>
           )}
 
-          <div className={styles.stock}>
-            <strong>Tồn kho:</strong> {product.stock > 0 ? `${product.stock} sản phẩm` : 'Hết hàng'}
-          </div>
+          {/* Variant Selection */}
+          {variants.length > 0 && (
+            <div className={styles.variantSelector}>
+              <label className={styles.variantLabel}>
+                <strong>Chọn biến thể:</strong>
+              </label>
+              <div className={styles.variantOptions}>
+                {variants.map((variant) => (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    className={`${styles.variantOption} ${selectedVariant?.id === variant.id ? styles.variantSelected : ''} ${variant.stock <= 0 ? styles.variantOutOfStock : ''}`}
+                    onClick={() => handleVariantChange(variant)}
+                    disabled={variant.stock <= 0}
+                  >
+                    <span>{variant.name}</span>
+                    {variant.stock <= 0 && <span className={styles.outOfStockBadge}>Hết hàng</span>}
+                  </button>
+                ))}
+              </div>
+              {selectedVariant && (
+                <div className={styles.variantInfo}>
+                  <strong>Tồn kho:</strong> {selectedVariant.stock > 0 ? `${selectedVariant.stock} sản phẩm` : 'Hết hàng'}
+                </div>
+              )}
+            </div>
+          )}
 
-          {product.stock > 0 && (
+          {variants.length === 0 && (
+            <div className={styles.stock}>
+              <strong>Tồn kho:</strong> {product.stock > 0 ? `${product.stock} sản phẩm` : 'Hết hàng'}
+            </div>
+          )}
+
+          {((selectedVariant && selectedVariant.stock > 0) || (!selectedVariant && product.stock > 0)) && (
             <div className={styles.quantitySelector}>
               <label className={styles.quantityLabel}>Số lượng:</label>
               <div className={styles.quantityControls}>
@@ -501,13 +568,13 @@ function ProductDetail() {
                   value={quantity}
                   onChange={handleQuantityChange}
                   min="1"
-                  max={product.stock}
+                  max={selectedVariant ? selectedVariant.stock : product.stock}
                 />
                 <button
                   type="button"
                   className={styles.quantityButton}
                   onClick={handleIncreaseQuantity}
-                  disabled={quantity >= product.stock}
+                  disabled={quantity >= (selectedVariant ? selectedVariant.stock : product.stock)}
                 >
                   +
                 </button>
@@ -519,14 +586,14 @@ function ProductDetail() {
             <button
               className={styles.addToCartButton}
               onClick={handleAddToCart}
-              disabled={addingToCart || !userInfo || product.stock <= 0}
+              disabled={addingToCart || !userInfo || ((selectedVariant ? selectedVariant.stock : product.stock) <= 0)}
             >
               {addingToCart ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
             </button>
             <button
               className={styles.buyNowButton}
               onClick={handleBuyNow}
-              disabled={!userInfo || product.stock <= 0}
+              disabled={!userInfo || ((selectedVariant ? selectedVariant.stock : product.stock) <= 0)}
             >
               Mua ngay
             </button>

@@ -3,7 +3,10 @@ package com.hometech.hometech.controller.Api;
 import com.hometech.hometech.dto.ProductImageDTO;
 import com.hometech.hometech.model.Category;
 import com.hometech.hometech.model.Product;
+import com.hometech.hometech.model.ProductAttributeValue;
 import com.hometech.hometech.model.ProductImage;
+import com.hometech.hometech.model.ProductVariant;
+import com.hometech.hometech.Repository.ProductVariantRepository;
 import com.hometech.hometech.service.CategoryService;
 import com.hometech.hometech.service.NotifyService;
 import com.hometech.hometech.service.ProductImageService;
@@ -23,15 +26,18 @@ public class ProductRestController {
     private final CategoryService categoryService;
     private final ProductImageService productImageService;
     private final NotifyService notifyService;
+    private final ProductVariantRepository productVariantRepository;
 
     public ProductRestController(ProductService productService,
                                  CategoryService categoryService,
                                  ProductImageService productImageService,
-                                 NotifyService notifyService) {
+                                 NotifyService notifyService,
+                                 ProductVariantRepository productVariantRepository) {
         this.productService = productService;
         this.categoryService = categoryService;
         this.productImageService = productImageService;
         this.notifyService = notifyService;
+        this.productVariantRepository = productVariantRepository;
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(
@@ -139,45 +145,70 @@ public class ProductRestController {
 
     // 🟢 Cập nhật sản phẩm
     @PutMapping("/{id}")
-public ResponseEntity<Map<String, Object>> updateProduct(@PathVariable long id, @RequestBody Product product) {
+    public ResponseEntity<Map<String, Object>> updateProduct(@PathVariable long id, @RequestBody Product product) {
 
-    Product existing = productService.getById(id);
+        Product existing = productService.getById(id);
 
-    if (existing == null) {
-        return buildResponse(false, "Không tìm thấy sản phẩm", null, "Product not found", HttpStatus.NOT_FOUND);
-    }
-
-    // Copy các trường cần update từ request body sang existing
-    // KHÔNG copy images để tránh xóa orphan
-    existing.setName(product.getName());
-    existing.setPrice(product.getPrice());
-    existing.setStock(product.getStock());
-    existing.setDescription(product.getDescription());
-    existing.setHidden(product.isHidden());
-
-    // Xử lý category nếu có thay đổi
-    if (product.getCategory() != null && product.getCategory().getId() != null) {
-        Category category = categoryService.getById(product.getCategory().getId());
-        if (category == null) {
-            return buildResponse(false, "Category không tồn tại", null, "Invalid category", HttpStatus.BAD_REQUEST);
+        if (existing == null) {
+            return buildResponse(false, "Không tìm thấy sản phẩm", null, "Product not found", HttpStatus.NOT_FOUND);
         }
-        existing.setCategory(category);
+
+        // Copy các trường cần update từ request body sang existing
+        existing.setName(product.getName());
+        existing.setPrice(product.getPrice());
+        existing.setStock(product.getStock());
+        existing.setDescription(product.getDescription());
+        existing.setHidden(product.isHidden());
+
+        // Xử lý attributeValues: xóa tất cả cũ, rồi thêm mới (vì orphanRemoval=true)
+        if (existing.getAttributeValues() == null) {
+            existing.setAttributeValues(new ArrayList<>());
+        } else {
+            existing.getAttributeValues().clear();
+        }
+        if (product.getAttributeValues() != null && !product.getAttributeValues().isEmpty()) {
+            for (ProductAttributeValue av : product.getAttributeValues()) {
+                av.setProduct(existing);
+                existing.getAttributeValues().add(av);
+            }
+        }
+
+        // Xử lý variants: xóa tất cả cũ, rồi thêm mới (vì orphanRemoval=true)
+        if (existing.getVariants() == null) {
+            existing.setVariants(new ArrayList<>());
+        } else {
+            existing.getVariants().clear();
+        }
+        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+            for (ProductVariant variant : product.getVariants()) {
+                variant.setProduct(existing);
+                existing.getVariants().add(variant);
+            }
+        }
+
+        // Xử lý category nếu có thay đổi
+        if (product.getCategory() != null && product.getCategory().getId() != null) {
+            Category category = categoryService.getById(product.getCategory().getId());
+            if (category == null) {
+                return buildResponse(false, "Category không tồn tại", null, "Invalid category", HttpStatus.BAD_REQUEST);
+            }
+            existing.setCategory(category);
+        }
+
+        // Save existing (giữ nguyên images cũ)
+        Product updated = productService.save(existing);
+
+        try {
+            notifyService.notifyAdmins(
+                    String.format("Sản phẩm \"%s\" đã được cập nhật", updated.getName()),
+                    "PRODUCT_UPDATED",
+                    updated.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send product update notification: " + e.getMessage());
+        }
+
+        return buildResponse(true, "Cập nhật sản phẩm thành công", updated, null, HttpStatus.OK);
     }
-
-    // Save existing (giữ nguyên images cũ)
-    Product updated = productService.save(existing);
-
-    try {
-        notifyService.notifyAdmins(
-                String.format("Sản phẩm \"%s\" đã được cập nhật", updated.getName()),
-                "PRODUCT_UPDATED",
-                updated.getId());
-    } catch (Exception e) {
-        System.err.println("❌ Failed to send product update notification: " + e.getMessage());
-    }
-
-    return buildResponse(true, "Cập nhật sản phẩm thành công", updated, null, HttpStatus.OK);
-}
 
     // 🟢 Lấy thông tin danh mục và thống kê
     @GetMapping("/category/{categoryId}/info")
@@ -288,6 +319,23 @@ public ResponseEntity<Map<String, Object>> updateProduct(@PathVariable long id, 
         }
     }
 
+    @PutMapping("/images/{imageId}/display-order")
+    public ResponseEntity<Map<String, Object>> updateImageDisplayOrder(
+            @PathVariable Long imageId,
+            @RequestBody Map<String, Integer> request) {
+        try {
+            Integer displayOrder = request.get("displayOrder");
+            if (displayOrder == null) {
+                return buildResponse(false, "displayOrder là bắt buộc", null, "displayOrder is required", HttpStatus.BAD_REQUEST);
+            }
+            ProductImage image = productImageService.updateDisplayOrder(imageId, displayOrder);
+            ProductImageDTO imageDTO = new ProductImageDTO(image);
+            return buildResponse(true, "Cập nhật thứ tự hiển thị thành công", imageDTO, null, HttpStatus.OK);
+        } catch (Exception e) {
+            return buildResponse(false, "Lỗi cập nhật thứ tự hiển thị", null, e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteProduct(@PathVariable long id) {
         Product product = productService.getById(id);
@@ -310,6 +358,13 @@ public ResponseEntity<Map<String, Object>> updateProduct(@PathVariable long id, 
         }
 
         return buildResponse(true, "Xóa sản phẩm thành công", null, null, HttpStatus.OK);
+    }
+
+    // 🟢 Lấy danh sách biến thể của sản phẩm
+    @GetMapping("/{productId}/variants")
+    public ResponseEntity<Map<String, Object>> getProductVariants(@PathVariable Long productId) {
+        List<ProductVariant> variants = productVariantRepository.findByProduct_Id(productId);
+        return buildResponse(true, "Lấy danh sách biến thể thành công", variants, null, HttpStatus.OK);
     }
 
 

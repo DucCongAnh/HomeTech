@@ -60,9 +60,14 @@ public class CartRestController {
     public ResponseEntity<Map<String, Object>> addToCart(
             @RequestParam Long userId,
             @RequestParam int productId,
-            @RequestParam(defaultValue = "1") int quantity) {
-        CartItem added = service.addProduct(userId, productId, quantity);
-        return buildResponse(true, "Thêm sản phẩm vào giỏ thành công", added, null, HttpStatus.OK);
+            @RequestParam(defaultValue = "1") int quantity,
+            @RequestParam(required = false) Long variantId) {
+        try {
+            CartItem added = service.addProduct(userId, productId, quantity, variantId);
+            return buildResponse(true, "Thêm sản phẩm vào giỏ thành công", added, null, HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return buildResponse(false, e.getMessage(), null, e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
     }
 
     // 🟢 Tăng số lượng

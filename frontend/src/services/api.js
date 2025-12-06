@@ -29,6 +29,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Bỏ qua lỗi network hoặc lỗi không có response
+    if (!error.response) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -47,7 +52,10 @@ api.interceptors.response.use(
       } catch (refreshError) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        // Chỉ redirect nếu không phải là request đến auth endpoint
+        if (!originalRequest.url.includes('/auth/')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }
@@ -347,6 +355,13 @@ export const adminAPI = {
     return response.data;
   },
 
+  updateImageDisplayOrder: async (imageId, displayOrder) => {
+    const response = await api.put(`/products/images/${imageId}/display-order`, {
+      displayOrder: displayOrder,
+    });
+    return response.data;
+  },
+
   // Marketing content (banners, sliders, footer)
   getSiteBanners: async (type = null) => {
     const response = await api.get('/admin/content/banners', {
@@ -416,6 +431,27 @@ export const adminAPI = {
   // Categories
   getAllCategories: async () => {
     const response = await api.get('/categories');
+    return response.data;
+  },
+
+  // Category attributes
+  getCategoryAttributes: async (categoryId) => {
+    const response = await api.get(`/categories/${categoryId}/attributes`);
+    return response.data;
+  },
+
+  createCategoryAttribute: async (categoryId, attribute) => {
+    const response = await api.post(`/categories/${categoryId}/attributes`, attribute);
+    return response.data;
+  },
+
+  updateCategoryAttribute: async (attributeId, attribute) => {
+    const response = await api.put(`/categories/attributes/${attributeId}`, attribute);
+    return response.data;
+  },
+
+  deleteCategoryAttribute: async (attributeId) => {
+    const response = await api.delete(`/categories/attributes/${attributeId}`);
     return response.data;
   },
 
@@ -525,6 +561,11 @@ export const userAPI = {
     return response.data;
   },
 
+  getProductVariants: async (productId) => {
+    const response = await api.get(`/products/${productId}/variants`);
+    return response.data;
+  },
+
   getActiveProductsByCategory: async (categoryId) => {
     const response = await api.get(`/products/category/${categoryId}/active`);
     return response.data;
@@ -581,11 +622,15 @@ export const userAPI = {
     return response.data;
   },
 
-  addToCart: async (userId, productId, quantity = 1) => {
+  addToCart: async (userId, productId, quantity = 1, variantId = null) => {
     // Gửi params trong URL query string cho POST request
     try {
+      let url = `/cart/add?userId=${userId}&productId=${productId}&quantity=${quantity}`;
+      if (variantId) {
+        url += `&variantId=${variantId}`;
+      }
       const response = await api.post(
-        `/cart/add?userId=${userId}&productId=${productId}&quantity=${quantity}`,
+        url,
         {},
         {
           headers: {

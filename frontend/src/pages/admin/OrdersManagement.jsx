@@ -392,7 +392,14 @@ export default function OrdersManagement() {
                   ) : (
                     (selectedOrder.items || []).map((item) => (
                       <tr key={item.id} className="border-t">
-                        <td className="px-4 py-3">{item.product?.name || 'Sản phẩm đã xóa'}</td>
+                        <td className="px-4 py-3">
+                          {item.product?.name || 'Sản phẩm đã xóa'}
+                          {item.variant && (
+                            <span className="ml-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              - {item.variant.name}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-center">{item.quantity}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(item.price)}</td>
                         <td className="px-4 py-3 text-right font-medium">

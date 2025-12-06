@@ -29,6 +29,7 @@ public class OrderService {
     private final VoucherRepository voucherRepo;
     private final PaymentRepository paymentRepository;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
 
 
     public OrderService(OrderRepository orderRepo, OrderItemRepository orderItemRepo,
@@ -37,7 +38,8 @@ public class OrderService {
                         AddressRepository addressRepo,
                         VoucherRepository voucherRepo,
                         PaymentRepository paymentRepository,
-                        ProductRepository productRepository) {
+                        ProductRepository productRepository,
+                        ProductVariantRepository productVariantRepository) {
         this.orderRepo = orderRepo;
         this.orderItemRepo = orderItemRepo;
         this.cartRepo = cartRepo;
@@ -47,6 +49,7 @@ public class OrderService {
         this.voucherRepo=voucherRepo;
         this.paymentRepository = paymentRepository;
         this.productRepository = productRepository;
+        this.productVariantRepository = productVariantRepository;
     }
 
     // 🟢 Tạo đơn hàng từ giỏ hàng của user cụ thể
@@ -90,6 +93,7 @@ public class OrderService {
         List<OrderItem> orderItems = new ArrayList<>();
 
         List<Product> productsToUpdate = new ArrayList<>();
+        List<ProductVariant> variantsToUpdate = new ArrayList<>();
 
         if (isBuyNow) {
             Product product = productRepository.findById(productId)
@@ -127,9 +131,21 @@ public class OrderService {
                 Product product = productRepository.findById(c.getProduct().getId())
                         .orElseThrow(() -> new RuntimeException("Sản phẩm trong giỏ không còn tồn tại."));
 
-                if (product.getStock() < c.getQuantity()) {
-                    throw new RuntimeException(String.format("Sản phẩm %s chỉ còn %d sản phẩm trong kho.",
-                            product.getName(), product.getStock()));
+                ProductVariant variant = c.getVariant();
+                
+                // Kiểm tra stock: nếu có variant thì kiểm tra stock của variant, nếu không thì kiểm tra stock của product
+                if (variant != null) {
+                    if (variant.getStock() < c.getQuantity()) {
+                        throw new RuntimeException(String.format("Biến thể %s của sản phẩm %s chỉ còn %d sản phẩm trong kho.",
+                                variant.getName(), product.getName(), variant.getStock()));
+                    }
+                    // Cập nhật stock của variant
+                    variant.setStock(variant.getStock() - c.getQuantity());
+                } else {
+                    if (product.getStock() < c.getQuantity()) {
+                        throw new RuntimeException(String.format("Sản phẩm %s chỉ còn %d sản phẩm trong kho.",
+                                product.getName(), product.getStock()));
+                    }
                 }
 
                 double itemTotal = product.getPrice() * c.getQuantity();
@@ -137,10 +153,12 @@ public class OrderService {
 
                 OrderItem oi = new OrderItem();
                 oi.setProduct(product);
+                oi.setVariant(variant); // Copy variant từ CartItem
                 oi.setQuantity(c.getQuantity());
                 oi.setPrice(product.getPrice());
                 orderItems.add(oi);
 
+                // Cập nhật stock của product (tổng stock)
                 product.setStock(product.getStock() - c.getQuantity());
                 product.setSoldCount(product.getSoldCount() + c.getQuantity());
                 
@@ -150,6 +168,11 @@ public class OrderService {
                 }
                 
                 productsToUpdate.add(product);
+                
+                // Lưu variant để cập nhật stock
+                if (variant != null) {
+                    variantsToUpdate.add(variant);
+                }
             }
         }
 
@@ -213,6 +236,9 @@ public class OrderService {
         orderRepo.save(order);
         orderItemRepo.saveAll(orderItems);
         productRepository.saveAll(productsToUpdate);
+        if (!variantsToUpdate.isEmpty()) {
+            productVariantRepository.saveAll(variantsToUpdate);
+        }
 
         Payment payment = order.getPayment();
         if (payment == null) {
@@ -279,9 +305,9 @@ public class OrderService {
             subtotal = product.getPrice() * purchaseQuantity;
         } else {
             List<CartItem> cartItems = cartRepo.findByCart(customer.getCart());
-            if (cartItems.isEmpty()) {
-                throw new RuntimeException("Giỏ hàng trống");
-            }
+            // if (cartItems.isEmpty()) {
+            //     throw new RuntimeException("Giỏ hàng trống");
+            // }
 
             subtotal = cartItems.stream()
                     .mapToDouble(c -> c.getProduct().getPrice() * c.getQuantity())
@@ -620,6 +646,7 @@ public class OrderService {
         }
 
         List<Product> productsToUpdate = new ArrayList<>();
+        List<ProductVariant> variantsToRestore = new ArrayList<>();
 
         for (OrderItem item : orderItems) {
             Product product = item.getProduct();
@@ -636,11 +663,28 @@ public class OrderService {
             }
             
             productsToUpdate.add(product);
+            
+            // Hoàn trả stock của variant nếu có
+            ProductVariant variant = item.getVariant();
+            if (variant != null) {
+                variant.setStock(variant.getStock() + quantityToRestore);
+                variantsToRestore.add(variant);
+            }
         }
 
         // Lưu các sản phẩm đã cập nhật
         if (!productsToUpdate.isEmpty()) {
             productRepository.saveAll(productsToUpdate);
+        }
+        
+        // Lưu các variant đã cập nhật
+        if (!variantsToRestore.isEmpty()) {
+            productVariantRepository.saveAll(variantsToRestore);
+        }
+        
+        // Lưu các variant đã cập nhật
+        if (!variantsToRestore.isEmpty()) {
+            productVariantRepository.saveAll(variantsToRestore);
         }
     }
 }
