@@ -121,6 +121,15 @@ public class SecurityConfig {
                                 "/api/reviews/**",
                                 "/api/vouchers/**"
                         ).permitAll()
+                        // Payment APIs - cho phép PayOS create public (PayOS cần gọi mà không JWT)
+                        .requestMatchers("/api/payment/payos/create").permitAll()
+                        // VNPAY create vẫn yêu cầu login nếu cần
+                        .requestMatchers("/api/payment/vnpay/create").authenticated()
+                        // Payment webhooks - public (called by payment providers)
+                        .requestMatchers(
+                                "/api/payment/vnpay/**",
+                                "/api/payment/payos/webhook"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -162,6 +171,11 @@ public class SecurityConfig {
     @Order(3)
     public SecurityFilterChain webFilterChain(HttpSecurity http) throws Exception {
         http
+                .securityMatcher(request -> {
+                    // Only match requests that are NOT API or payment endpoints
+                    String path = request.getRequestURI();
+                    return !path.startsWith("/api/") && !path.startsWith("/payment/");
+                })
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
@@ -170,12 +184,9 @@ public class SecurityConfig {
                                 "/auth/**",
                                 "/oauth2/**",
                                 "/payment/**",
-                                "/api/reviews/**",
-                                "/api/reviews/*/hide",
-                                "/api/reviews/*/show",
                                 "/admin/login", "/admin/register",
                                 "/css/**", "/js/**", "/images/**",
-                                "/ws/**", "/api/notify/**", "/api/notifications/**",  // Move to API chain if truly stateless
+                                "/ws/**",
                                 "/test-notification", "/websocket-test"
                         ).permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -207,7 +218,20 @@ public class SecurityConfig {
                         .permitAll()
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/auth/login"))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            // For API-like requests (JSON content type), return 401 JSON instead of redirect
+                            String acceptHeader = request.getHeader("Accept");
+                            String contentType = request.getContentType();
+                            if ((acceptHeader != null && acceptHeader.contains("application/json")) ||
+                                (contentType != null && contentType.contains("application/json"))) {
+                                response.setContentType("application/json; charset=utf-8");
+                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                response.getOutputStream().println("{ \"error\": \"Unauthorized\" }");
+                            } else {
+                                // For web requests, redirect to login page
+                                new LoginUrlAuthenticationEntryPoint("/auth/login").commence(request, response, authException);
+                            }
+                        })
                 )
                 .authenticationProvider(authenticationProvider());
 

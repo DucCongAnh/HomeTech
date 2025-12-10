@@ -36,7 +36,8 @@ const PAYMENT_METHOD_TEXT = {
   COD: 'Thanh toán khi nhận hàng',
   MOMO: 'Thanh toán MoMo',
   CARD: 'Thanh toán thẻ',
-  VNPAY: 'Thanh toán VNPAY'
+  VNPAY: 'Thanh toán VNPAY',
+  PAYOS: 'Thanh toán PayOS'
 };
 
 const unwrapData = (payload, fallback = null) => {

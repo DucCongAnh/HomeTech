@@ -799,6 +799,13 @@ export const paymentAPI = {
     });
     return response.data;
   },
+  createPayOsPayment: async (orderId) => {
+  const response = await api.post('/payment/payos/create', null, {
+    params: { orderId: orderId }
+  });
+  return response.data;
+}
+  
 };
 
 export const notificationAPI = {

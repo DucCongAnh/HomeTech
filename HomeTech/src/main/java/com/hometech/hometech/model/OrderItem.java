@@ -71,6 +71,7 @@ public class OrderItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "variant_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "product"})
     private ProductVariant variant;
 
     public ProductVariant getVariant() {

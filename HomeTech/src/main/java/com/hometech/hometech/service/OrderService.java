@@ -9,11 +9,10 @@ import java.util.Map;
 
 import com.hometech.hometech.Repository.*;
 import com.hometech.hometech.dto.PreviewOrderResponse;
-import com.hometech.hometech.model.*;
-import org.springframework.stereotype.Service;
-
 import com.hometech.hometech.enums.OrderStatus;
 import com.hometech.hometech.enums.PaymentMethod;
+import com.hometech.hometech.model.*;
+import org.springframework.stereotype.Service;
 
 @Service
 public class OrderService {
@@ -30,6 +29,7 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final PayOsService payOsService;
 
 
     public OrderService(OrderRepository orderRepo, OrderItemRepository orderItemRepo,
@@ -39,7 +39,8 @@ public class OrderService {
                         VoucherRepository voucherRepo,
                         PaymentRepository paymentRepository,
                         ProductRepository productRepository,
-                        ProductVariantRepository productVariantRepository) {
+                        ProductVariantRepository productVariantRepository,
+                        PayOsService payOsService) {
         this.orderRepo = orderRepo;
         this.orderItemRepo = orderItemRepo;
         this.cartRepo = cartRepo;
@@ -50,6 +51,7 @@ public class OrderService {
         this.paymentRepository = paymentRepository;
         this.productRepository = productRepository;
         this.productVariantRepository = productVariantRepository;
+        this.payOsService = payOsService;
     }
 
     // 🟢 Tạo đơn hàng từ giỏ hàng của user cụ thể
@@ -225,7 +227,10 @@ public class OrderService {
         order.setStatus(OrderStatus.WAITING_CONFIRMATION);
         order.setCreatedAt(LocalDateTime.now());
         order.setVoucher(voucher);   // ⬅ ⬅ Gắn voucher vào Order
-        order.setPaymentMethod(paymentMethod != null ? paymentMethod : PaymentMethod.COD);
+        PaymentMethod finalPaymentMethod = paymentMethod != null ? paymentMethod : PaymentMethod.COD;
+        System.out.println("🔍 OrderService.createOrder - setting paymentMethod: " + finalPaymentMethod);
+        System.out.println("🔍 OrderService.createOrder - paymentMethod == PAYOS? " + (finalPaymentMethod == PaymentMethod.PAYOS));
+        order.setPaymentMethod(finalPaymentMethod);
         order.setItems(orderItems);
         order.setVoucherCodeSnapshot(voucher != null ? voucher.getCode() : null);
         order.setDiscountAmount(discount);
@@ -470,6 +475,8 @@ public class OrderService {
         // Hoàn trả tồn kho trước khi hủy đơn
         restoreStockFromCancelledOrder(order);
 
+        // (Đã bỏ hoàn tiền PayOS theo yêu cầu)
+
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepo.save(order);
 
@@ -497,6 +504,8 @@ public class OrderService {
 
         // Hoàn trả tồn kho trước khi hủy đơn
         restoreStockFromCancelledOrder(order);
+
+        // (Đã bỏ hoàn tiền PayOS theo yêu cầu)
 
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepo.save(order);

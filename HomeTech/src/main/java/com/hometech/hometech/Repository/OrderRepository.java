@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
     // Lấy tất cả đơn hàng của một customer
@@ -20,5 +21,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     
     @EntityGraph(attributePaths = {"items", "items.product", "items.variant"})
     List<Order> findByStatus(OrderStatus status);
+    
+    // Load order với tất cả quan hệ cần thiết cho PayOS
+    @EntityGraph(attributePaths = {"items", "items.product", "items.variant", "orderInfo", "payment"})
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findByIdWithRelations(@Param("id") Long id);
 
 }

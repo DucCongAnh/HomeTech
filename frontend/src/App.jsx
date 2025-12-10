@@ -17,6 +17,7 @@ import ExpenseManagement from './pages/ExpenseManagement';
 import NotificationBell from './components/NotificationBell';
 import ChatWidget from './components/ChatWidget';
 import VnPayResult from './pages/VnPayResult';
+import PayOsResult from './pages/PayOsResult';
 import './App.css';
 
 function AppRoutes() {
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/expenses" element={<ExpenseManagement />} />
         <Route path="/payment/vnpay/result" element={<VnPayResult />} />
+        <Route path="/payment/payos/result" element={<PayOsResult />} />
         <Route path="/favorites" element={<Favorites />} />
 
         {/* Default redirect */}

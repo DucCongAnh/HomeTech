@@ -67,9 +67,17 @@ public class OrderRestController {
             @RequestParam(required = false) Integer quantity
     ) {
         try {
+            System.out.println("🔍 OrderRestController.createOrder - paymentMethod received: " + paymentMethod);
+            System.out.println("🔍 OrderRestController.createOrder - paymentMethod type: " + (paymentMethod != null ? paymentMethod.getClass().getName() : "null"));
+            if (paymentMethod != null) {
+                System.out.println("🔍 OrderRestController.createOrder - paymentMethod.name(): " + paymentMethod.name());
+            }
             Order order = orderService.createOrder(userId, voucherCode, paymentMethod, productId, quantity);
+            System.out.println("🔍 OrderRestController.createOrder - order created with paymentMethod: " + order.getPaymentMethod());
             return buildResponse(true, "Đơn hàng được tạo thành công", order, null, HttpStatus.OK);
         } catch (RuntimeException e) {
+            System.err.println("❌ OrderRestController.createOrder error: " + e.getMessage());
+            e.printStackTrace();
             return buildResponse(false, "Tạo đơn hàng thất bại", null, e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }

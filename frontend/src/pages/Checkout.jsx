@@ -17,6 +17,12 @@ const PAYMENT_OPTIONS = [
     comingSoon: false,
   },
   {
+    id: 'PAYOS',
+    label: 'PayOS (QR/Chuyển khoản)',
+    description: 'Thanh toán qua cổng PayOS.',
+    comingSoon: false,
+  },
+  {
     id: 'MOMO',
     label: 'Ví MoMo',
     description: 'Đang phát triển',
@@ -211,12 +217,16 @@ export default function Checkout() {
         paymentMethod,
       };
 
+      console.log('🔍 Checkout.handlePlaceOrder - paymentMethod:', paymentMethod);
+      console.log('🔍 Checkout.handlePlaceOrder - orderOptions:', orderOptions);
+
       if (isBuyNowMode) {
         orderOptions.productId = buyNowContext.productId;
         orderOptions.quantity = activeQuantity;
       }
 
       const response = await userAPI.createOrder(userInfo.id, orderOptions);
+      console.log('🔍 Checkout.handlePlaceOrder - createOrder response:', response);
       if (response?.success === false) {
         throw new Error(response?.error || response?.message || 'Không thể tạo đơn hàng');
       }
@@ -231,6 +241,19 @@ export default function Checkout() {
           throw new Error(paymentResponse?.message || 'Không thể khởi tạo thanh toán VNPAY');
         }
         window.location.href = paymentResponse.paymentUrl;
+        return;
+      }
+
+      if (paymentMethod === 'PAYOS') {
+        console.log('🔍 Checkout.handlePlaceOrder - Creating PayOS payment for order:', createdOrder?.id);
+        const paymentResponse = await paymentAPI.createPayOsPayment(createdOrder?.id);
+        console.log('🔍 Checkout.handlePlaceOrder - PayOS payment response:', paymentResponse);
+        if (!paymentResponse?.success || !paymentResponse?.checkoutUrl) {
+          console.error('❌ Checkout.handlePlaceOrder - PayOS payment failed:', paymentResponse);
+          throw new Error(paymentResponse?.message || 'Không thể khởi tạo thanh toán PayOS');
+        }
+        console.log('✅ Checkout.handlePlaceOrder - Redirecting to PayOS checkout:', paymentResponse.checkoutUrl);
+        window.location.href = paymentResponse.checkoutUrl;
         return;
       }
 
